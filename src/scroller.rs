@@ -24,6 +24,13 @@ pub struct Scroller {
     initial_velocity: f32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct ScrollerValue {
+    pub offset: f32,
+    pub velocity: f32,
+}
+
 impl Scroller {
     pub fn new(deceleration_rate: DecelerationRate) -> Self {
         Self {
@@ -40,7 +47,7 @@ impl Scroller {
         self.initial_velocity = velocity;
     }
 
-    pub fn value(&mut self, time: f32) -> Option<f32> {
+    pub fn value(&mut self, time: f32) -> Option<ScrollerValue> {
         let rate = *self.deceleration_rate;
         let coefficient = rate.powf(time);
         let velocity = self.initial_velocity * coefficient;
@@ -50,7 +57,7 @@ impl Scroller {
             return None;
         }
 
-        Some(offset)
+        Some(ScrollerValue { offset, velocity })
     }
 
     pub fn reset(&mut self) {
