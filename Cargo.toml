@@ -4,7 +4,10 @@ authors = ["ktiays <cuansky@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["staticlib"]
 
-[dependencies]
-libm = "0.2"
+[profile.release]
+opt-level = 3
+codegen-units = 1
+panic = "abort"

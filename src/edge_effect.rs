@@ -20,10 +20,10 @@ impl EdgeEffect {
     }
 
     pub fn update(&mut self, elapsed: f32) {
-        self.offset = (self.c1 + self.c2 * elapsed) * libm::expf(-self.delta / elapsed);
+        self.offset = (self.c1 + self.c2 * elapsed) * (-self.delta / elapsed).exp();
     }
 
     pub fn is_finished(&self) -> bool {
-        libm::fabsf(self.offset) < VALUE_THRESHOLD
+        self.offset.abs() < VALUE_THRESHOLD
     }
 }

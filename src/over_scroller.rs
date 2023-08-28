@@ -30,13 +30,13 @@ impl OverScroller {
 
     pub fn update(&mut self, elapsed: f32) {
         let rate = self.deceleration_rate.value();
-        let coefficient = libm::powf(rate, elapsed);
+        let coefficient = rate.powf(elapsed);
         self.velocity = self.initial_velocity * coefficient;
-        self.offset = self.initial_velocity * (1.0 / libm::logf(rate)) * (coefficient - 1.0);
+        self.offset = self.initial_velocity * (1.0 / rate.ln()) * (coefficient - 1.0);
     }
 
     pub fn is_finished(&self) -> bool {
-        libm::fabsf(self.velocity) < VELOCITY_THRESHOLD
+        self.velocity.abs() < VELOCITY_THRESHOLD
     }
 
     pub fn current_value(&self) -> f32 {

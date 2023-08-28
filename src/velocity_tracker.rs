@@ -12,30 +12,47 @@ struct DataPoint {
     pub value: f32,
 }
 
-static HISTORY_SIZE: usize = 20;
-static HORIZON_MILLISECONDS: f32 = 100_f32;
-static ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS: f32 = 40_f32;
+const HISTORY_SIZE: usize = 20;
+const HORIZON_MILLISECONDS: f32 = 100_f32;
+const ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS: f32 = 40_f32;
 
-static MIN_SAMPLE_SIZE: usize = 3;
+const MIN_SAMPLE_SIZE: usize = 3;
+
+#[derive(Debug)]
+struct Cache {
+    reusable_values: Vector,
+    reusable_time: Vector,
+}
+
+impl Cache {
+    fn new() -> Self {
+        Self {
+            reusable_values: Vector::with_capacity(HISTORY_SIZE),
+            reusable_time: Vector::with_capacity(HISTORY_SIZE),
+        }
+    }
+}
+
+impl Default for Cache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Debug)]
 pub struct VelocityTracker {
-    samples: Vec<DataPoint>,
+    samples: [Option<DataPoint>; HISTORY_SIZE],
     index: usize,
 
-    reusable_values: RefCell<Vector>,
-    reusable_time: RefCell<Vector>,
+    cache: RefCell<Cache>,
 }
 
 impl VelocityTracker {
     pub fn new() -> Self {
-        let mut samples = Vec::with_capacity(HISTORY_SIZE);
-        samples.resize(HISTORY_SIZE, DataPoint::default());
         Self {
-            samples,
+            samples: [None; HISTORY_SIZE],
             index: 0,
-            reusable_values: RefCell::new(Vector::with_capacity(HISTORY_SIZE)),
-            reusable_time: RefCell::new(Vector::with_capacity(HISTORY_SIZE)),
+            cache: RefCell::new(Default::default()),
         }
     }
 
@@ -46,7 +63,7 @@ impl VelocityTracker {
             value,
         };
         self.index = (self.index + 1) % HISTORY_SIZE;
-        self.samples[self.index] = data_point;
+        self.samples[self.index] = Some(data_point);
     }
 
     /// Computes the estimated velocity at the time of the last provided data point.
@@ -55,25 +72,27 @@ impl VelocityTracker {
         let mut sample_count = 0;
 
         // The sample at index is our newest sample.  If it is null, we have no samples so return.
-        let Some(newest) = self.samples.get(index).cloned() else {
+        let Some(newest) = self.samples[index] else {
             return 0.0;
         };
         let mut previous = newest;
 
+        let mut cache_mut = self.cache.borrow_mut();
+
         loop {
-            let Some(sample) = self.samples.get(index).cloned() else {
+            let Some(sample) = self.samples[index] else {
                 break;
             };
 
             let age = newest.time - sample.time;
-            let delta = libm::fabsf(sample.value - previous.value);
+            let delta = (sample.value - previous.value).abs();
             previous = sample;
             if age > HORIZON_MILLISECONDS || delta > ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS {
                 break;
             }
 
-            self.reusable_values.borrow_mut()[sample_count] = sample.value;
-            self.reusable_time.borrow_mut()[sample_count] = -age;
+            cache_mut.reusable_values[sample_count] = sample.value;
+            cache_mut.reusable_time[sample_count] = -age;
             index = if index == 0 { HISTORY_SIZE } else { index } - 1;
 
             sample_count += 1;
@@ -84,17 +103,15 @@ impl VelocityTracker {
         }
 
         if sample_count >= MIN_SAMPLE_SIZE {
-            let mut coefficients = Vec::with_capacity(3);
-            coefficients.resize(3, 0_f32);
             // The 2nd coefficient is the derivative of the quadratic polynomial at
             // x = 0, and that happens to be the last timestamp that we end up
             // passing to polyFitLeastSquares.
             return poly_fit_least_squares(
-                self.reusable_time.borrow().clone(),
-                self.reusable_values.borrow().clone(),
+                &cache_mut.reusable_time,
+                &cache_mut.reusable_values,
                 sample_count,
                 2,
-                coefficients,
+                [0_f32; 3],
             )
             .ok()
             .map(|r| r.get(1).cloned())
@@ -154,7 +171,7 @@ impl Vector {
     }
 
     pub fn norm(&self) -> f32 {
-        libm::sqrtf(self.dot(self))
+        self.dot(self).sqrt()
     }
 }
 
@@ -174,12 +191,12 @@ impl IndexMut<usize> for Vector {
 
 /// Fits a polynomial of the given degree to the data points.
 fn poly_fit_least_squares(
-    x: Vector,
-    y: Vector,
+    x: &Vector,
+    y: &Vector,
     sample_count: usize,
     degree: usize,
-    mut coefficients: Vec<f32>,
-) -> Result<Vec<f32>, &'static str> {
+    mut coefficients: [f32; 3],
+) -> Result<[f32; 3], &'static str> {
     if degree < 1 {
         return Err("The degree must be at positive integer");
     }
@@ -242,13 +259,29 @@ fn poly_fit_least_squares(
     // We just work from bottom-right to top-left calculating B's coefficients.
     let wy = y;
 
-    for i in (0..n - 1).rev() {
+    for i in (0..=n - 1).rev() {
         coefficients[i] = q[i].dot(&wy);
-        for j in (i + 1..n - 1).rev() {
+        for j in (i + 1..=n - 1).rev() {
             coefficients[i] -= r[i][j] * coefficients[j];
         }
         coefficients[i] /= r[i][i];
     }
 
     return Ok(coefficients);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VelocityTracker;
+
+    #[test]
+    fn simple() {
+        let mut velocity_tracker = VelocityTracker::new();
+        velocity_tracker.add_data_point(0_f32, 0_f32);
+        velocity_tracker.add_data_point(10_f32, 20_f32);
+        velocity_tracker.add_data_point(20_f32, 30_f32);
+        velocity_tracker.add_data_point(30_f32, 40_f32);
+        let velocity = velocity_tracker.calculate();
+        assert!((velocity - 0.55).abs() < 0.001)
+    }
 }
