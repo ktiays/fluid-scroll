@@ -10,7 +10,7 @@ pub struct EdgeEffect {
 
 impl EdgeEffect {
     pub fn absorb(&mut self, velocity: f32, distance: f32) {
-        self.absorb_with_delta(velocity, distance, 12f32)
+        self.absorb_with_delta(velocity, distance, 12_f32)
     }
 
     pub fn absorb_with_delta(&mut self, velocity: f32, distance: f32, delta: f32) {

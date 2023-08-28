@@ -13,8 +13,8 @@ struct DataPoint {
 }
 
 static HISTORY_SIZE: usize = 20;
-static HORIZON_MILLISECONDS: f32 = 100f32;
-static ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS: f32 = 40f32;
+static HORIZON_MILLISECONDS: f32 = 100_f32;
+static ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS: f32 = 40_f32;
 
 static MIN_SAMPLE_SIZE: usize = 3;
 
@@ -85,7 +85,7 @@ impl VelocityTracker {
 
         if sample_count >= MIN_SAMPLE_SIZE {
             let mut coefficients = Vec::with_capacity(3);
-            coefficients.resize(3, 0f32);
+            coefficients.resize(3, 0_f32);
             // The 2nd coefficient is the derivative of the quadratic polynomial at
             // x = 0, and that happens to be the last timestamp that we end up
             // passing to polyFitLeastSquares.
@@ -102,7 +102,7 @@ impl VelocityTracker {
             .unwrap_or_default();
         }
 
-        return 0f32;
+        return 0_f32;
     }
 }
 
@@ -140,13 +140,13 @@ impl Vector {
     pub fn with_capacity(capacity: usize) -> Self {
         let mut vector = Vec::with_capacity(capacity);
         for _ in 0..capacity {
-            vector.push(0f32);
+            vector.push(0_f32);
         }
         Self(vector)
     }
 
     pub fn dot(&self, other: &Self) -> f32 {
-        let mut result = 0f32;
+        let mut result = 0_f32;
         for i in 0..self.0.len() {
             result += self.0[i] * other.0[i];
         }
@@ -199,7 +199,7 @@ fn poly_fit_least_squares(
     // Expand the X vector to a matrix A, pre-multiplied by the weights.
     let mut a = Matrix::new(n, m);
     for h in 0..m {
-        a[0][h] = 1f32;
+        a[0][h] = 1_f32;
         for i in 1..n {
             a[i][h] = a[i - 1][h] * x[h];
         }
@@ -228,13 +228,13 @@ fn poly_fit_least_squares(
             return Err("Vectors are linearly dependent or zero so no solution.");
         }
 
-        let inverse_norm = 1f32 / norm;
+        let inverse_norm = 1_f32 / norm;
         for h in 0..m {
             q[j][h] *= inverse_norm;
         }
         let v = &mut r[j];
         for i in 0..n {
-            v[i] = if i < j { 0f32 } else { q[j].dot(&a[i]) };
+            v[i] = if i < j { 0_f32 } else { q[j].dot(&a[i]) };
         }
     }
 
