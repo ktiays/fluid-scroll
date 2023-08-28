@@ -27,7 +27,7 @@ impl SpringBack {
             return Some(0_f32);
         }
 
-        let offset = (self.c1 + self.c2 * time) * (-self.delta / time).exp();
+        let offset = (self.c1 + self.c2 * time) * (-self.delta * time).exp();
         if offset.abs() < VALUE_THRESHOLD {
             return None;
         }
