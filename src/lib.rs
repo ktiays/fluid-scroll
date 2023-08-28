@@ -1,3 +1,3 @@
-pub mod edge_effect;
-pub mod over_scroller;
+pub mod scroller;
+pub mod spring_back;
 pub mod velocity_tracker;
