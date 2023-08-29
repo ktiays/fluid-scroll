@@ -16,7 +16,7 @@ impl Deref for DecelerationRate {
     }
 }
 
-static VELOCITY_THRESHOLD: f32 = 1e-2;
+const VELOCITY_THRESHOLD: f32 = 1e-2;
 
 #[derive(Debug)]
 pub struct Scroller {
