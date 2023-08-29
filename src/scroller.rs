@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use crate::constants::VELOCITY_THRESHOLD;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct DecelerationRate(pub f32);
 
@@ -15,8 +17,6 @@ impl Deref for DecelerationRate {
         &self.0
     }
 }
-
-const VELOCITY_THRESHOLD: f32 = 1e-2;
 
 #[derive(Debug)]
 pub struct Scroller {

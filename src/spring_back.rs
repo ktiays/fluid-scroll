@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
-const VALUE_THRESHOLD: f32 = 4e-3;
+use crate::constants::{VALUE_THRESHOLD, VELOCITY_THRESHOLD};
+
 const DEFAULT_RESPONSE: f32 = 0.575_f32;
 
 #[derive(Debug, Default)]
@@ -26,18 +27,23 @@ impl SpringBack {
     }
 
     pub fn value(&mut self, time: f32) -> Option<f32> {
-        if time.abs() < f32::EPSILON {
-            return Some(0_f32);
-        }
-
         let offset = (self.c1 + self.c2 * time) * (-self.lambda * time).exp();
-        if offset.abs() < VALUE_THRESHOLD {
-            return None;
+
+        let velocity = self.velocity_at(time);
+        if offset.abs() < VALUE_THRESHOLD && velocity.abs() < VELOCITY_THRESHOLD {
+            None
+        } else {
+            Some(offset)
         }
-        Some(offset)
     }
 
     pub fn reset(&mut self) {
         *self = Self::default();
+    }
+}
+
+impl SpringBack {
+    fn velocity_at(&self, time: f32) -> f32 {
+        (self.c2 - self.lambda * (self.c1 + self.c2 * time)) * (-self.lambda * time).exp()
     }
 }
