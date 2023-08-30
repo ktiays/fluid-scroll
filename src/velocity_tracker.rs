@@ -39,7 +39,7 @@ impl Default for Cache {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VelocityTracker {
     samples: [Option<DataPoint>; HISTORY_SIZE],
     index: usize,
@@ -49,11 +49,7 @@ pub struct VelocityTracker {
 
 impl VelocityTracker {
     pub fn new() -> Self {
-        Self {
-            samples: [None; HISTORY_SIZE],
-            index: 0,
-            cache: RefCell::new(Default::default()),
-        }
+        Self::default()
     }
 
     /// Adds a data point for velocity calculation at a given time.
@@ -114,12 +110,11 @@ impl VelocityTracker {
                 [0_f32; 3],
             )
             .ok()
-            .map(|r| r.get(1).cloned())
-            .flatten()
+            .and_then(|r| r.get(1).cloned())
             .unwrap_or_default();
         }
 
-        return 0_f32;
+        0_f32
     }
 }
 
@@ -156,9 +151,7 @@ struct Vector(Vec<f32>);
 impl Vector {
     pub fn with_capacity(capacity: usize) -> Self {
         let mut vector = Vec::with_capacity(capacity);
-        for _ in 0..capacity {
-            vector.push(0_f32);
-        }
+        vector.resize(capacity, 0_f32);
         Self(vector)
     }
 
@@ -260,14 +253,14 @@ fn poly_fit_least_squares(
     let wy = y;
 
     for i in (0..=n - 1).rev() {
-        coefficients[i] = q[i].dot(&wy);
+        coefficients[i] = q[i].dot(wy);
         for j in (i + 1..=n - 1).rev() {
             coefficients[i] -= r[i][j] * coefficients[j];
         }
         coefficients[i] /= r[i][i];
     }
 
-    return Ok(coefficients);
+    Ok(coefficients)
 }
 
 #[cfg(test)]
