@@ -32,8 +32,10 @@ At this point, you are ready to scroll.
 You just need to retrieve the distance of movement for each moment from the `scroller` at the frequency you desire.
 
 ```rust
-// After 16 milliseconds, the distance that needs to be moved relative to the start of scrolling.
-let offset = scroller.value(16.0);
+// After 16 milliseconds, the expected offset and velocity at this moment.
+let scroller_value = scroller.value(16.0);
+let offset = scroller_value.offset;
+let velocity = scroller_value.velocity;
 ```
 
 ### Edge Bounce
