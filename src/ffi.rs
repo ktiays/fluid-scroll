@@ -1,5 +1,6 @@
 use std::ffi::{c_char, c_void};
 
+use crate::rubber_band;
 use crate::scroller::*;
 use crate::spring_back::*;
 
@@ -115,5 +116,5 @@ pub extern "C" fn fl_spring_back_reset(spring_back_ptr: *mut c_void) {
 
 #[no_mangle]
 pub extern "C" fn fl_calculate_rubber_band_offset(offset: f32, range: f32) -> f32 {
-    SpringBack::calculate_rubber_band_offset(offset, range)
+    rubber_band::calculate_offset(offset, range)
 }

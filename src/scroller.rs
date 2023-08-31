@@ -2,11 +2,17 @@ use std::ops::Deref;
 
 use crate::constants::VELOCITY_THRESHOLD;
 
+/// Deceleration rates for the scroll animation.
+///
+/// You can create a deceleration rate with the specified raw value.
+/// The raw value should be in the range of 0.0 to 1.0 (exclusive).
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct DecelerationRate(pub f32);
 
 impl DecelerationRate {
+    /// The default deceleration rate for a scroll animation.
     pub const NORMAL: Self = Self(0.998);
+    /// A fast deceleration rate for a scroll animation.
     pub const FAST: Self = Self(0.99);
 }
 
