@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "scroll-physics"
+name = "fluid-scroll"
 version = "0.1.0"
