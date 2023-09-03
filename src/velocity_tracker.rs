@@ -3,6 +3,7 @@ use core::{
     cell::RefCell,
     ops::{Index, IndexMut},
 };
+use std::ops::Deref;
 
 extern crate alloc;
 
@@ -15,8 +16,6 @@ struct DataPoint {
 const HISTORY_SIZE: usize = 20;
 const HORIZON_MILLISECONDS: f32 = 100_f32;
 const ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS: f32 = 40_f32;
-
-const MIN_SAMPLE_SIZE: usize = 3;
 
 #[derive(Debug)]
 struct Cache {
@@ -39,8 +38,21 @@ impl Default for Cache {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Strategy {
+    Instantaneous,
+    Lsq2,
+}
+
+impl Default for Strategy {
+    fn default() -> Self {
+        Self::Instantaneous
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct VelocityTracker {
+    strategy: Strategy,
     samples: [Option<DataPoint>; HISTORY_SIZE],
     index: usize,
 
@@ -50,6 +62,13 @@ pub struct VelocityTracker {
 impl VelocityTracker {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_strategy(strategy: Strategy) -> Self {
+        Self {
+            strategy,
+            ..Self::default()
+        }
     }
 
     /// Adds a data point for velocity calculation at a given time.
@@ -98,23 +117,48 @@ impl VelocityTracker {
             }
         }
 
-        if sample_count >= MIN_SAMPLE_SIZE {
-            // The 2nd coefficient is the derivative of the quadratic polynomial at
-            // x = 0, and that happens to be the last timestamp that we end up
-            // passing to polyFitLeastSquares.
-            return poly_fit_least_squares(
-                &cache_mut.reusable_time,
-                &cache_mut.reusable_values,
-                sample_count,
-                2,
-                [0_f32; 3],
-            )
-            .ok()
-            .and_then(|r| r.get(1).cloned())
-            .unwrap_or_default();
-        }
+        if sample_count >= self.min_sample_size() {
+            match self.strategy {
+                Strategy::Instantaneous => calculate_instantaneous_velocity(
+                    cache_mut.reusable_time.iter().take(sample_count),
+                    cache_mut.reusable_values.iter().take(sample_count),
+                )
+                .ok(),
 
-        0_f32
+                Strategy::Lsq2 =>
+                // The 2nd coefficient is the derivative of the quadratic polynomial at
+                // x = 0, and that happens to be the last timestamp that we end up
+                // passing to `poly_fit_least_squares`.
+                {
+                    poly_fit_least_squares(
+                        &cache_mut.reusable_time,
+                        &cache_mut.reusable_values,
+                        sample_count,
+                        2,
+                        [0_f32; 3],
+                    )
+                    .ok()
+                    .and_then(|r| r.get(1).cloned())
+                }
+            }
+            .unwrap_or_default()
+        } else {
+            0_f32
+        }
+    }
+
+    pub fn approaching_halt(horizontal_velocity: f32, vertical_velocity: f32) -> bool {
+        horizontal_velocity * horizontal_velocity + vertical_velocity * vertical_velocity
+            < 0.0625_f32
+    }
+}
+
+impl VelocityTracker {
+    fn min_sample_size(&self) -> usize {
+        match self.strategy {
+            Strategy::Instantaneous => 2,
+            Strategy::Lsq2 => 3,
+        }
     }
 }
 
@@ -165,6 +209,14 @@ impl Vector {
 
     pub fn norm(&self) -> f32 {
         self.dot(self).sqrt()
+    }
+}
+
+impl Deref for Vector {
+    type Target = Vec<f32>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -263,18 +315,89 @@ fn poly_fit_least_squares(
     Ok(coefficients)
 }
 
+fn calculate_instantaneous_velocity<'a, T, V>(
+    times_iter: T,
+    values_iter: V,
+) -> Result<f32, &'static str>
+where
+    T: ExactSizeIterator<Item = &'a f32>,
+    V: ExactSizeIterator<Item = &'a f32>,
+{
+    if times_iter.len() != values_iter.len() {
+        return Err("The number of times and values must be equal");
+    }
+
+    let sample_count = times_iter.len();
+    if sample_count < 2 {
+        return Err("At least two points must be provided");
+    }
+
+    struct VelocitySample {
+        start: f32,
+        end: f32,
+        dt: f32,
+    }
+
+    impl VelocitySample {
+        fn velocity(&self) -> f32 {
+            (self.end - self.start) / self.dt
+        }
+    }
+
+    let points = values_iter.zip(times_iter).collect::<Vec<_>>();
+    let samples = points
+        .windows(2)
+        .map(|window| VelocitySample {
+            start: *window[1].0,
+            end: *window[0].0,
+            dt: window[0].1 - window[1].1,
+        })
+        .map(|s| s.velocity())
+        .collect::<Vec<_>>();
+    // Every two points can be combined to form a sample.
+    // At least one sample is required to calculate the velocity.
+    if samples.len() == 1 {
+        return Ok(*samples.get(0).expect("At least one sample"));
+    }
+
+    let mut velocities = samples
+        .windows(2)
+        .map(|window| window[0] * 0.2 + window[1] * 0.8);
+    let velocity = velocities.next().expect("At least one velocity");
+    // Only the two most recent velocities are used for calculation.
+    let result = if let Some(previous_velocity) = velocities.next() {
+        previous_velocity * 0.75 + velocity * 0.25
+    } else {
+        velocity
+    };
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::velocity_tracker::Strategy;
+
     use super::VelocityTracker;
 
     #[test]
-    fn simple() {
-        let mut velocity_tracker = VelocityTracker::new();
+    fn test_lsq2() {
+        let mut velocity_tracker = VelocityTracker::with_strategy(Strategy::Lsq2);
         velocity_tracker.add_data_point(0_f32, 0_f32);
         velocity_tracker.add_data_point(10_f32, 20_f32);
         velocity_tracker.add_data_point(20_f32, 30_f32);
         velocity_tracker.add_data_point(30_f32, 40_f32);
         let velocity = velocity_tracker.calculate();
         assert!((velocity - 0.55).abs() < 0.001)
+    }
+
+    #[test]
+    fn test_instantaneous() {
+        let mut velocity_tracker = VelocityTracker::with_strategy(Strategy::Instantaneous);
+        velocity_tracker.add_data_point(0_f32, 0_f32);
+        velocity_tracker.add_data_point(10_f32, 20_f32);
+        velocity_tracker.add_data_point(20_f32, 30_f32);
+        velocity_tracker.add_data_point(60_f32, 40_f32);
+        let velocity = velocity_tracker.calculate();
+        assert!((velocity - 1.5625).abs() < 0.001)
     }
 }
