@@ -38,10 +38,11 @@ impl Default for Cache {
     }
 }
 
+#[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 pub enum Strategy {
-    Instantaneous,
-    Lsq2,
+    Instantaneous = 0,
+    Lsq2 = 1,
 }
 
 impl Default for Strategy {
@@ -145,6 +146,11 @@ impl VelocityTracker {
         } else {
             0_f32
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.samples.fill(None);
+        self.index = 0;
     }
 
     pub fn approaching_halt(horizontal_velocity: f32, vertical_velocity: f32) -> bool {

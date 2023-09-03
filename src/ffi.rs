@@ -3,6 +3,7 @@ use std::ffi::{c_char, c_void};
 use crate::rubber_band;
 use crate::scroller::*;
 use crate::spring_back::*;
+use crate::velocity_tracker::*;
 
 #[no_mangle]
 pub extern "C" fn fl_scroller_init(scroller_ptr: *mut c_void, deceleration_rate: f32) {
@@ -117,4 +118,48 @@ pub extern "C" fn fl_spring_back_reset(spring_back_ptr: *mut c_void) {
 #[no_mangle]
 pub extern "C" fn fl_calculate_rubber_band_offset(offset: f32, range: f32) -> f32 {
     rubber_band::calculate_offset(offset, range)
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_tracker_new(strategy: Strategy) -> *mut c_void {
+    let velocity_tracker = Box::new(VelocityTracker::with_strategy(strategy));
+    Box::into_raw(velocity_tracker) as *mut _
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_tracker_new_default() -> *mut c_void {
+    fl_velocity_tracker_new(Strategy::Instantaneous)
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_tracker_free(velocity_tracker_ptr: *mut c_void) {
+    let velocity_tracker = unsafe { Box::from_raw(velocity_tracker_ptr as *mut VelocityTracker) };
+    drop(velocity_tracker)
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_tracker_add_data_point(
+    velocity_tracker_ptr: *mut c_void,
+    time: f32,
+    position: f32,
+) {
+    let velocity_tracker = unsafe { &mut *(velocity_tracker_ptr as *mut VelocityTracker) };
+    velocity_tracker.add_data_point(time, position);
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_tracker_calculate_velocity(velocity_tracker_ptr: *mut c_void) -> f32 {
+    let velocity_tracker = unsafe { &mut *(velocity_tracker_ptr as *mut VelocityTracker) };
+    velocity_tracker.calculate()
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_tracker_reset(velocity_tracker_ptr: *mut c_void) {
+    let velocity_tracker = unsafe { &mut *(velocity_tracker_ptr as *mut VelocityTracker) };
+    velocity_tracker.reset();
+}
+
+#[no_mangle]
+pub extern "C" fn fl_velocity_approaching_halt(horizontal: f32, vertical: f32) -> bool {
+    VelocityTracker::approaching_halt(horizontal, vertical)
 }

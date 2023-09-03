@@ -6,7 +6,7 @@ mod velocity_tracker;
 
 pub use scroller::Scroller;
 pub use spring_back::SpringBack;
-pub use velocity_tracker::VelocityTracker;
+pub use velocity_tracker::{Strategy as VelocityTrackerStrategy, VelocityTracker};
 
 #[cfg(feature = "ffi")]
 pub mod ffi;

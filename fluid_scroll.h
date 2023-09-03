@@ -49,6 +49,29 @@ void fl_spring_back_reset(FlSpringBack *spring_back);
 
 float fl_calculate_rubber_band_offset(float offset, float range);
 
+typedef struct __FlVelocityTracker FlVelocityTracker;
+
+enum FlVelocityTrackerStrategy {
+  FL_VELOCITY_TRACKER_INSTANTANEOUS_STRATEGY = 0,
+  FL_VELOCITY_TRACKER_LSQ2_STRATEGY = 1,
+};
+
+FlVelocityTracker *fl_velocity_tracker_new(FlVelocityTrackerStrategy strategy);
+
+FlVelocityTracker *fl_velocity_tracker_new_default(void);
+
+void fl_velocity_tracker_free(FlVelocityTracker *velocity_tracker);
+
+void fl_velocity_tracker_add_data_point(FlVelocityTracker *velocity_tracker,
+                                        float time, float position);
+
+float fl_velocity_tracker_calculate_velocity(
+    FlVelocityTracker *velocity_tracker);
+
+void fl_velocity_tracker_reset(FlVelocityTracker *velocity_tracker);
+
+bool fl_velocity_approaching_halt(float vx, float vy);
+
 #ifdef __cplusplus
 }
 #endif
