@@ -39,7 +39,7 @@ impl Default for Cache {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Strategy {
     Instantaneous = 0,
     Lsq2 = 1,
@@ -101,10 +101,13 @@ impl VelocityTracker {
             };
 
             let age = newest.time - sample.time;
-            let delta = (sample.value - previous.value).abs();
-            previous = sample;
-            if age > HORIZON_MILLISECONDS || delta > ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS {
-                break;
+            // Instantaneous strategy does not discard any data obtained.
+            if self.strategy != Strategy::Instantaneous {
+                let delta = (sample.value - previous.value).abs();
+                previous = sample;
+                if age > HORIZON_MILLISECONDS || delta > ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS {
+                    break;
+                }
             }
 
             cache_mut.reusable_values[sample_count] = sample.value;
@@ -121,8 +124,8 @@ impl VelocityTracker {
         if sample_count >= self.min_sample_size() {
             match self.strategy {
                 Strategy::Instantaneous => calculate_instantaneous_velocity(
-                    cache_mut.reusable_time.iter().take(sample_count),
-                    cache_mut.reusable_values.iter().take(sample_count),
+                    cache_mut.reusable_time.iter().take(sample_count.min(4)),
+                    cache_mut.reusable_values.iter().take(sample_count.min(4)),
                 )
                 .ok(),
 
@@ -399,11 +402,12 @@ mod tests {
     #[test]
     fn test_instantaneous() {
         let mut velocity_tracker = VelocityTracker::with_strategy(Strategy::Instantaneous);
-        velocity_tracker.add_data_point(0_f32, 0_f32);
-        velocity_tracker.add_data_point(10_f32, 20_f32);
-        velocity_tracker.add_data_point(20_f32, 30_f32);
-        velocity_tracker.add_data_point(60_f32, 40_f32);
+        velocity_tracker.add_data_point(0_f32, 456_f32);
+        velocity_tracker.add_data_point(10.69_f32, 376_f32);
+        velocity_tracker.add_data_point(26.74_f32, 276_f32);
+        velocity_tracker.add_data_point(43.52_f32, 153.5_f32);
+        velocity_tracker.add_data_point(58.22_f32, 151.5_f32);
         let velocity = velocity_tracker.calculate();
-        assert!((velocity - 1.5625).abs() < 0.001)
+        assert!((velocity + 6.3).abs() < 0.001)
     }
 }
