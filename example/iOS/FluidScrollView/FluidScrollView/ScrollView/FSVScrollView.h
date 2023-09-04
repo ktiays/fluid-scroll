@@ -5,6 +5,8 @@
 
 #import <UIKit/UIKit.h>
 
+#import "FSVScrollViewScrollObserver.h"
+
 NS_ASSUME_NONNULL_BEGIN
 
 NS_SWIFT_NAME(FluidScrollView)
@@ -16,7 +18,13 @@ NS_SWIFT_NAME(FluidScrollView)
 
 @property (nonatomic, assign) UIEdgeInsets contentInsets;
 
+@property (nonatomic, assign, readonly) UIEdgeInsets adjustedContentInset;
+
 @property (nonatomic, assign) UIScrollViewDecelerationRate decelerationRate;
+
+- (void)scrollToTop;
+
+- (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer NS_SWIFT_NAME(addScrollObserver(_:));
 
 @end
 

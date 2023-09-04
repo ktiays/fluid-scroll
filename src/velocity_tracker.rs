@@ -366,7 +366,7 @@ where
     // Every two points can be combined to form a sample.
     // At least one sample is required to calculate the velocity.
     if samples.len() == 1 {
-        return Ok(*samples.get(0).expect("At least one sample"));
+        return Ok(*samples.first().expect("At least one sample"));
     }
 
     let mut velocities = samples

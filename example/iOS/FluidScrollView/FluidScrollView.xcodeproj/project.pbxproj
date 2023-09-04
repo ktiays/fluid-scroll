@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D6566482AA58F3600F04152 /* CGPointMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D6566472AA58F3600F04152 /* CGPointMath.m */; };
+		2D65664B2AA5AD0200F04152 /* FSVScrollToTop.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */; };
+		2D65664E2AA5BF9400F04152 /* UIEdgeInsetsMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */; };
 		EDB8D6592AA4E2BE001E1723 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8D6582AA4E2BE001E1723 /* AppDelegate.swift */; };
 		EDB8D65B2AA4E2BE001E1723 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8D65A2AA4E2BE001E1723 /* SceneDelegate.swift */; };
 		EDB8D65D2AA4E2BE001E1723 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8D65C2AA4E2BE001E1723 /* ViewController.swift */; };
@@ -32,6 +35,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D6566462AA58F3600F04152 /* CGPointMath.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CGPointMath.h; sourceTree = "<group>"; };
+		2D6566472AA58F3600F04152 /* CGPointMath.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CGPointMath.m; sourceTree = "<group>"; };
+		2D6566492AA5AD0200F04152 /* FSVScrollToTop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollToTop.h; sourceTree = "<group>"; };
+		2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FSVScrollToTop.m; sourceTree = "<group>"; };
+		2D65664C2AA5BF9400F04152 /* UIEdgeInsetsMath.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UIEdgeInsetsMath.h; sourceTree = "<group>"; };
+		2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UIEdgeInsetsMath.m; sourceTree = "<group>"; };
+		2D6566512AA5DD3400F04152 /* FSVScrollViewScrollObserver.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollViewScrollObserver.h; sourceTree = "<group>"; };
 		EDB8D6552AA4E2BE001E1723 /* FluidScrollView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FluidScrollView.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EDB8D6582AA4E2BE001E1723 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		EDB8D65A2AA4E2BE001E1723 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -107,6 +117,8 @@
 			children = (
 				EDB8D6842AA4EE2E001E1723 /* NSSet+Sequence.h */,
 				EDB8D6852AA4EE2E001E1723 /* NSSet+Sequence.m */,
+				2D6566492AA5AD0200F04152 /* FSVScrollToTop.h */,
+				2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -116,6 +128,11 @@
 			children = (
 				EDB8D66E2AA4E3DB001E1723 /* FSVScrollView.h */,
 				EDB8D66F2AA4E3DB001E1723 /* FSVScrollView.mm */,
+				2D65664C2AA5BF9400F04152 /* UIEdgeInsetsMath.h */,
+				2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */,
+				2D6566462AA58F3600F04152 /* CGPointMath.h */,
+				2D6566472AA58F3600F04152 /* CGPointMath.m */,
+				2D6566512AA5DD3400F04152 /* FSVScrollViewScrollObserver.h */,
 			);
 			path = ScrollView;
 			sourceTree = "<group>";
@@ -212,7 +229,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/zsh;
-			shellScript = "cd ../../..\ncargo build --release --features ffi --target aarch64-apple-ios\n";
+			shellScript = "cd ../../../\ncargo build --release --features ffi --target aarch64-apple-ios\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -221,10 +238,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2D65664E2AA5BF9400F04152 /* UIEdgeInsetsMath.m in Sources */,
+				2D65664B2AA5AD0200F04152 /* FSVScrollToTop.m in Sources */,
 				EDB8D65D2AA4E2BE001E1723 /* ViewController.swift in Sources */,
 				EDB8D6592AA4E2BE001E1723 /* AppDelegate.swift in Sources */,
 				EDB8D6862AA4EE2E001E1723 /* NSSet+Sequence.m in Sources */,
 				EDB8D6702AA4E3DB001E1723 /* FSVScrollView.mm in Sources */,
+				2D6566482AA58F3600F04152 /* CGPointMath.m in Sources */,
 				EDB8D65B2AA4E2BE001E1723 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -391,7 +411,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = "../../../target/aarch64-apple-ios/release";
+				LIBRARY_SEARCH_PATHS = "../../../target/aarch64-apple-ios/release/**";
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-lfluid_scroll";
 				PRODUCT_BUNDLE_IDENTIFIER = me.ktiays.FluidScrollView;
@@ -425,7 +445,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				LIBRARY_SEARCH_PATHS = "../../../target/aarch64-apple-ios/release";
+				LIBRARY_SEARCH_PATHS = "../../../target/aarch64-apple-ios/release/**";
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-lfluid_scroll";
 				PRODUCT_BUNDLE_IDENTIFIER = me.ktiays.FluidScrollView;

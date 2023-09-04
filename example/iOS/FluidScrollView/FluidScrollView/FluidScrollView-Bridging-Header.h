@@ -3,3 +3,4 @@
 //
 
 #import "FSVScrollView.h"
+#import "FSVScrollToTop.h"
