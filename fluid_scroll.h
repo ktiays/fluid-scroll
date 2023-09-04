@@ -52,7 +52,7 @@ float fl_calculate_rubber_band_offset(float offset, float range);
 typedef struct __FlVelocityTracker FlVelocityTracker;
 
 enum FlVelocityTrackerStrategy {
-  FL_VELOCITY_TRACKER_INSTANTANEOUS_STRATEGY = 0,
+  FL_VELOCITY_TRACKER_RECURRENCE_STRATEGY = 0,
   FL_VELOCITY_TRACKER_LSQ2_STRATEGY = 1,
 };
 

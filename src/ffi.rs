@@ -128,7 +128,7 @@ pub extern "C" fn fl_velocity_tracker_new(strategy: Strategy) -> *mut c_void {
 
 #[no_mangle]
 pub extern "C" fn fl_velocity_tracker_new_default() -> *mut c_void {
-    fl_velocity_tracker_new(Strategy::Instantaneous)
+    fl_velocity_tracker_new(Strategy::Recurrence)
 }
 
 #[no_mangle]

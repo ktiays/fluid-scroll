@@ -41,13 +41,13 @@ impl Default for Cache {
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Strategy {
-    Instantaneous = 0,
+    Recurrence = 0,
     Lsq2 = 1,
 }
 
 impl Default for Strategy {
     fn default() -> Self {
-        Self::Instantaneous
+        Self::Recurrence
     }
 }
 
@@ -101,8 +101,9 @@ impl VelocityTracker {
             };
 
             let age = newest.time - sample.time;
-            // Instantaneous strategy does not discard any data obtained.
-            if self.strategy != Strategy::Instantaneous {
+            // Using a recurrence relation for calculation,
+            // no sampling point can be discarded.
+            if self.strategy != Strategy::Recurrence {
                 let delta = (sample.value - previous.value).abs();
                 previous = sample;
                 if age > HORIZON_MILLISECONDS || delta > ASSUME_POINTER_MOVE_STOPPED_MILLISECONDS {
@@ -123,9 +124,9 @@ impl VelocityTracker {
 
         if sample_count >= self.min_sample_size() {
             match self.strategy {
-                Strategy::Instantaneous => calculate_instantaneous_velocity(
-                    cache_mut.reusable_time.iter().take(sample_count.min(4)),
-                    cache_mut.reusable_values.iter().take(sample_count.min(4)),
+                Strategy::Recurrence => calculate_recurrence_relation_velocity(
+                    cache_mut.reusable_time.iter().take(sample_count).rev(),
+                    cache_mut.reusable_values.iter().take(sample_count).rev(),
                 )
                 .ok(),
 
@@ -165,7 +166,7 @@ impl VelocityTracker {
 impl VelocityTracker {
     fn min_sample_size(&self) -> usize {
         match self.strategy {
-            Strategy::Instantaneous => 2,
+            Strategy::Recurrence => 2,
             Strategy::Lsq2 => 3,
         }
     }
@@ -324,7 +325,7 @@ fn poly_fit_least_squares(
     Ok(coefficients)
 }
 
-fn calculate_instantaneous_velocity<'a, T, V>(
+fn calculate_recurrence_relation_velocity<'a, T, V>(
     times_iter: T,
     values_iter: V,
 ) -> Result<f32, &'static str>
@@ -341,45 +342,31 @@ where
         return Err("At least two points must be provided");
     }
 
-    struct VelocitySample {
-        start: f32,
-        end: f32,
-        dt: f32,
-    }
-
-    impl VelocitySample {
-        fn velocity(&self) -> f32 {
-            (self.end - self.start) / self.dt
-        }
-    }
-
     let points = values_iter.zip(times_iter).collect::<Vec<_>>();
     let samples = points
         .windows(2)
-        .map(|window| VelocitySample {
-            start: *window[1].0,
-            end: *window[0].0,
-            dt: window[0].1 - window[1].1,
-        })
-        .map(|s| s.velocity())
+        .map(|window| (*window[1].0 - *window[0].0) / (*window[1].1 - *window[0].1))
         .collect::<Vec<_>>();
-    // Every two points can be combined to form a sample.
-    // At least one sample is required to calculate the velocity.
-    if samples.len() == 1 {
-        return Ok(*samples.first().expect("At least one sample"));
-    }
 
-    let mut velocities = samples
-        .windows(2)
-        .map(|window| window[0] * 0.2 + window[1] * 0.8);
-    let velocity = velocities.next().expect("At least one velocity");
-    // Only the two most recent velocities are used for calculation.
-    let result = if let Some(previous_velocity) = velocities.next() {
-        previous_velocity * 0.75 + velocity * 0.25
+    // Save the velocity values of the last two times.
+    let mut previous_velocity = None;
+    let mut current_velocity = None;
+    samples.windows(2).for_each(|window| {
+        let velocity = window[0] * 0.7 + window[1] * 0.3;
+        if let Some(current) = current_velocity {
+            previous_velocity = Some(current);
+            // Weighted average of the velocity with a ratio of 8:2 compared to the previous time.
+            current_velocity = Some(current * 0.8 + velocity * 0.2);
+        } else {
+            current_velocity = Some(velocity);
+        }
+    });
+    let current = current_velocity.expect("At least one velocity sampling is required");
+    if let Some(previous) = previous_velocity {
+        Ok(previous * 0.75 + current * 0.25)
     } else {
-        velocity
-    };
-    Ok(result)
+        Ok(current)
+    }
 }
 
 #[cfg(test)]
@@ -401,13 +388,13 @@ mod tests {
 
     #[test]
     fn test_instantaneous() {
-        let mut velocity_tracker = VelocityTracker::with_strategy(Strategy::Instantaneous);
+        let mut velocity_tracker = VelocityTracker::with_strategy(Strategy::Recurrence);
         velocity_tracker.add_data_point(0_f32, 456_f32);
         velocity_tracker.add_data_point(10.69_f32, 376_f32);
         velocity_tracker.add_data_point(26.74_f32, 276_f32);
         velocity_tracker.add_data_point(43.52_f32, 153.5_f32);
         velocity_tracker.add_data_point(58.22_f32, 151.5_f32);
         let velocity = velocity_tracker.calculate();
-        assert!((velocity + 6.3).abs() < 0.001)
+        assert!((velocity + 6.904).abs() < 0.001)
     }
 }
