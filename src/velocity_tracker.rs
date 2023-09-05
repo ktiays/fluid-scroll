@@ -125,8 +125,16 @@ impl VelocityTracker {
         if sample_count >= self.min_sample_size() {
             match self.strategy {
                 Strategy::Recurrence => calculate_recurrence_relation_velocity(
-                    cache_mut.reusable_time.iter().take(sample_count).rev(),
-                    cache_mut.reusable_values.iter().take(sample_count).rev(),
+                    cache_mut
+                        .reusable_time
+                        .iter()
+                        .take(sample_count.min(4))
+                        .rev(),
+                    cache_mut
+                        .reusable_values
+                        .iter()
+                        .take(sample_count.min(4))
+                        .rev(),
                 )
                 .ok(),
 
@@ -393,12 +401,12 @@ mod tests {
     #[test]
     fn test_instantaneous() {
         let mut velocity_tracker = VelocityTracker::with_strategy(Strategy::Recurrence);
-        velocity_tracker.add_data_point(0_f32, 456_f32);
-        velocity_tracker.add_data_point(10.69_f32, 376_f32);
-        velocity_tracker.add_data_point(26.74_f32, 276_f32);
-        velocity_tracker.add_data_point(43.52_f32, 153.5_f32);
+        velocity_tracker.add_data_point(1.53283_f32, 0_f32);
+        velocity_tracker.add_data_point(3.27537_f32, 376_f32);
+        velocity_tracker.add_data_point(5.27733_f32, 276_f32);
+        velocity_tracker.add_data_point(22.2795_f32, 153.5_f32);
         velocity_tracker.add_data_point(58.22_f32, 151.5_f32);
         let velocity = velocity_tracker.calculate();
-        assert!((velocity + 6.904).abs() < 0.001)
+        assert!((velocity + 6.678).abs() < 0.001)
     }
 }

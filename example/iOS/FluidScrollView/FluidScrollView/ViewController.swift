@@ -15,6 +15,8 @@ class ViewController: UIViewController {
     
     private var contentView: UIView!
     private var isContentViewLayout: Bool = false
+    
+    private var isNavigationBarEffectVisible: Bool = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -51,15 +53,45 @@ class ViewController: UIViewController {
     }
     
     private func updateNavigationBarEffect(visible: Bool, animated: Bool = false) {
+        if visible == isNavigationBarEffectVisible { return }
+        
         guard let navigationBar = self.navigationController?.navigationBar else { return }
         guard let barBackground = navigationBar.subviews.first else { return }
         if !barBackground.isKind(of: NSClassFromString("_UIBarBackground")!) { return }
+        
+        var viewsNeedChangeAlpha: [UIView] = []
+        for subview in barBackground.subviews {
+            if subview.isKind(of: NSClassFromString("_UIBarBackgroundShadowView")!) {
+                if let imageView = subview.subviews.first as? UIImageView {
+                    viewsNeedChangeAlpha.append(imageView)
+                }
+            } else {
+                viewsNeedChangeAlpha.append(subview)
+            }
+        }
+        
+        let alpha: CGFloat = visible ? 1 : 0
+        if animated {
+            UIView.animate(withDuration: 0.4) {
+                viewsNeedChangeAlpha.forEach {
+                    $0.alpha = alpha
+                }
+            }
+        } else {
+            viewsNeedChangeAlpha.forEach {
+                $0.alpha = alpha
+            }
+        }
+        
+        isNavigationBarEffectVisible = visible
     }
 
 }
 
 extension ViewController: FSVScrollViewScrollObserver {
     func observeScrollViewDidScroll(_ scrollView: FluidScrollView) {
-        
+        let offsetY = scrollView.contentOffset.y
+        let minOffsetY = scrollView.minimumContentOffset.y
+        updateNavigationBarEffect(visible: offsetY > minOffsetY)
     }
 }

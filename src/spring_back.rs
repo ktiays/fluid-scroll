@@ -24,10 +24,12 @@ impl SpringBack {
         self.lambda = 2_f32 * PI / response;
         self.c1 = distance;
         // The formula needs to be calculated in units of pixels per second.
-        self.c2 = velocity / 1e3 + self.lambda * distance;
+        self.c2 = velocity * 1e3 + self.lambda * distance;
     }
 
-    pub fn value(&self, time: f32) -> Option<f32> {
+    pub fn value(&self, mut time: f32) -> Option<f32> {
+        // Convert time from milliseconds to seconds.
+        time /= 1e3;
         let offset = (self.c1 + self.c2 * time) * (-self.lambda * time).exp();
 
         let velocity = self.velocity_at(time);

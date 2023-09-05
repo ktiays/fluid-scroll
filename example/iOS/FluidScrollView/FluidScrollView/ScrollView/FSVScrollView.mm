@@ -6,6 +6,7 @@
 #import <iostream>
 #import <memory>
 #import <optional>
+#import <cassert>
 
 #import "FSVScrollView.h"
 #import "fluid_scroll.h"
@@ -73,13 +74,13 @@ public:
                 return;
             }
             previous_traslation_ = translation();
-            active_touch_begin_location_ = translation();
+            active_touch_begin_location_ = touch_location(touch);
             
             active_touch_ = touch;
         } else {
             state_ = BEGAN;
-            touch_begin_time_ = CACurrentMediaTime();
             active_touch_ = [touches firstObject];
+            touch_begin_time_ = active_touch_.timestamp;
             active_touch_begin_location_ = active_touch_location();
         }
         add_current_location();
@@ -151,11 +152,16 @@ private:
         if (velocity_tracker_y_ == nullptr) {
             velocity_tracker_y_ = fl_velocity_tracker_new(FL_VELOCITY_TRACKER_RECURRENCE_STRATEGY);
         }
-        const auto now = static_cast<float>((CACurrentMediaTime() - touch_begin_time_) * 1e3);
+        const auto now = static_cast<float>((active_touch_.timestamp - touch_begin_time_) * 1e3);
         const auto trans = translation();
         fl_velocity_tracker_add_data_point(velocity_tracker_x_, now, static_cast<float>(trans.x));
         fl_velocity_tracker_add_data_point(velocity_tracker_y_, now, static_cast<float>(trans.y));
     }
+};
+
+enum class _BounceEdge {
+    NONE,
+    MIN, MAX
 };
 
 @interface FSVScrollView () <_FSVTouchDelegate>
@@ -179,6 +185,8 @@ private:
     BOOL _isDragging;
     bool _isDecelerating;
     bool _isBouncing;
+    _BounceEdge _bounceEdgeX;
+    _BounceEdge _bounceEdgeY;
     
     CGPoint _lastContentOffset;
     CGFloat _animationBeginTime;
@@ -194,6 +202,8 @@ private:
         _scrollerY = nullptr;
         _springBackX = nullptr;
         _scrollerY = nullptr;
+        _bounceEdgeX = _BounceEdge::NONE;
+        _bounceEdgeY = _BounceEdge::NONE;
         _scrollObservers = [NSHashTable weakObjectsHashTable];
         _decelerationRate = UIScrollViewDecelerationRateNormal;
     }
@@ -277,6 +287,8 @@ private:
             _isDragging = false;
             _isDecelerating = false;
             _isBouncing = false;
+            _bounceEdgeX = _BounceEdge::NONE;
+            _bounceEdgeY = _BounceEdge::NONE;
             _lastContentOffset = _contentOffset;
             _touchBeganTranslation = std::nullopt;
             break;
@@ -286,7 +298,7 @@ private:
             
             auto translation = proxy.translation();
             // There is a significant delay between the system calling `touchesBegan:withEvent:` and `touchesMoved:withEvent:`,
-            // which can cause large position jumps when responding to gesture.
+            // which can cause large position mutated when responding to gesture.
             // We use the translation of the first call to `touchesMoved:withEvent:` as a baseline to avoid this issue.
             if (!_touchBeganTranslation.has_value()) {
                 _touchBeganTranslation = translation;
@@ -299,6 +311,7 @@ private:
         case TouchProxy::State::ENDED:
         case TouchProxy::State::CANCELLED: {
             _isDragging = false;
+            // The direction of the gesture velocity is opposite to the sign of the content offset change.
             auto velocity = proxy.velocity();
             if (fl_velocity_approaching_halt(velocity.x, velocity.y)) {
                 velocity = CGPointZero;
@@ -320,49 +333,72 @@ private:
     }
     
     [self _updateAnimationPropertiesWithVelocity:velocity];
+    
+    [self _prepareScrollers];
+    [self _updateScrollersDecelerationRate];
     _isDecelerating = true;
 }
 
 - (void)_handleDisplayLinkFire:(CADisplayLink *)sender {
-    const auto now = CACurrentMediaTime();
     if (_isDecelerating) {
-        [self _prepareScrollers];
-        [self _updateScrollersDecelerationRate];
         CGPoint velocity;
-        _isDecelerating = ![self _handleDeceleratingWithInterval:(now - _animationBeginTime) * 1e3 finalVelocity:&velocity];
+        _isDecelerating = ![self _handleDeceleratingWithInterval:(CACurrentMediaTime() - _animationBeginTime) * 1e3 finalVelocity:&velocity];
         
-        if (_isDecelerating && [self _outOfRange]) {
+        const auto canHorizontalScroll = [self _canHorizontalScroll];
+        const auto canVerticalScroll = [self _canVerticalScroll];
+        const auto contentOffset = _contentOffset;
+        const auto minContentOffset = self.minimumContentOffset;
+        const auto maxContentOffset = self.maximumContentOffset;
+        CGPoint targetOffset = CGPointZero;
+        if (canHorizontalScroll && contentOffset.x < minContentOffset.x) {
+            _bounceEdgeX = _BounceEdge::MIN;
+            targetOffset.x = minContentOffset.x;
+        }
+        if (canHorizontalScroll && contentOffset.x > maxContentOffset.x) {
+            _bounceEdgeX = _BounceEdge::MAX;
+            targetOffset.x = maxContentOffset.x;
+        }
+        if (canVerticalScroll && contentOffset.y < minContentOffset.y) {
+            _bounceEdgeY = _BounceEdge::MIN;
+            targetOffset.y = minContentOffset.y;
+        }
+        if (canVerticalScroll && contentOffset.y > maxContentOffset.y) {
+            _bounceEdgeY = _BounceEdge::MAX;
+            targetOffset.y = maxContentOffset.y;
+        }
+        const auto outOfRange = (_bounceEdgeX != _BounceEdge::NONE || _bounceEdgeY != _BounceEdge::NONE);
+        if (_isDecelerating && outOfRange) {
             _isDecelerating = false;
             _isBouncing = true;
             [self _updateAnimationPropertiesWithVelocity:velocity];
+            [self _prepareSpringBacks];
+            if (_bounceEdgeX != _BounceEdge::NONE) 
+                fl_spring_back_absorb(_springBackX, velocity.x, targetOffset.x - contentOffset.x);
+            if (_bounceEdgeY != _BounceEdge::NONE)
+                fl_spring_back_absorb(_springBackY, velocity.y, targetOffset.y - contentOffset.y);
         }
     }
     if (_isBouncing) {
-        [self _prepareSpringBacks];
-        _isBouncing = ![self _handleBouncingWithInterval:(now - _animationBeginTime) * 1e3];
+        _isBouncing = ![self _handleBouncingWithInterval:(CACurrentMediaTime() - _animationBeginTime) * 1e3];
     }
 }
 
 - (bool)_handleDeceleratingWithInterval:(CFTimeInterval)interval finalVelocity:(CGPoint *)velocityPointer {
     bool finishX, finishY;
-    auto targetContentOffset = _animationBeginContentOffset;
+    auto targetContentOffset = _contentOffset;
     CGFloat finalVelocityX = 0;
     CGFloat finalVelocityY = 0;
     const auto valueX = fl_scroller_value(_scrollerX, (float) interval, &finishX);
-    if (finishX) {
-        targetContentOffset.x = _contentOffset.x;
-    } else {
+    if (!finishX) {
         const auto offsetX = valueX.offset;
         finalVelocityX = valueX.velocity;
-        targetContentOffset.x -= offsetX;
+        targetContentOffset.x = _animationBeginContentOffset.x - offsetX;
     }
     const auto valueY = fl_scroller_value(_scrollerY, (float) interval, &finishY);
-    if (finishY) {
-        targetContentOffset.y = _contentOffset.y;
-    } else {
+    if (!finishY) {
         const auto offsetY = valueY.offset;
         finalVelocityY = valueY.velocity;
-        targetContentOffset.y -= offsetY;
+        targetContentOffset.y = _animationBeginContentOffset.y - offsetY;
     }
     if (velocityPointer != nullptr) {
         *velocityPointer = CGPointMake(finalVelocityX, finalVelocityY);
@@ -372,7 +408,23 @@ private:
 }
 
 - (bool)_handleBouncingWithInterval:(CFTimeInterval)interval {
-    return true;
+    const auto minContentOffset = self.minimumContentOffset;
+    const auto maxContentOffset = self.maximumContentOffset;
+    CGPoint targetContentOffset = _contentOffset;
+    bool finishX = true;
+    bool finishY = true;
+    if (_bounceEdgeX != _BounceEdge::NONE) {
+        const auto target = _bounceEdgeX == _BounceEdge::MIN ? minContentOffset.x : maxContentOffset.x;
+        const auto offset = fl_spring_back_value(_springBackX, interval, &finishX);
+        targetContentOffset.x = target - offset;
+    }
+    if (_bounceEdgeY != _BounceEdge::NONE) {
+        const auto target = _bounceEdgeY == _BounceEdge::MIN ? minContentOffset.y : maxContentOffset.y;
+        const auto offset = fl_spring_back_value(_springBackY, interval, &finishY);
+        targetContentOffset.y = target - offset;
+    }
+    self.contentOffset = targetContentOffset;
+    return finishX && finishY;
 }
 
 #pragma mark - Public Methods
@@ -464,6 +516,12 @@ private:
 - (void)setContentOffset:(CGPoint)contentOffset {
     _contentOffset = contentOffset;
     [self setNeedsLayout];
+    
+    auto enumerator = [_scrollObservers objectEnumerator];
+    id<FSVScrollViewScrollObserver> observer;
+    while (observer = [enumerator nextObject]) {
+        [observer observeScrollViewDidScroll:self];
+    }
 }
 
 - (void)setContentSize:(CGSize)contentSize {
