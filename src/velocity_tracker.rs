@@ -352,7 +352,7 @@ where
     let mut previous_velocity = None;
     let mut current_velocity = None;
     samples.windows(2).for_each(|window| {
-        let velocity = window[0] * 0.7 + window[1] * 0.3;
+        let velocity = window[0] * 0.4 + window[1] * 0.6;
         if let Some(current) = current_velocity {
             previous_velocity = Some(current);
             // Weighted average of the velocity with a ratio of 8:2 compared to the previous time.
@@ -361,7 +361,11 @@ where
             current_velocity = Some(velocity);
         }
     });
-    let current = current_velocity.expect("At least one velocity sampling is required");
+    let Some(current) = current_velocity else {
+        return Ok(*samples
+            .first()
+            .expect("At least one velocity sampling is required"));
+    };
     if let Some(previous) = previous_velocity {
         Ok(previous * 0.75 + current * 0.25)
     } else {

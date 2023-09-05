@@ -5,6 +5,7 @@
 
 #import <iostream>
 #import <memory>
+#import <optional>
 
 #import "FSVScrollView.h"
 #import "fluid_scroll.h"
@@ -39,7 +40,10 @@ public:
     };
     
     TouchProxy(UIView<_FSVTouchDelegate> *view)
-        : delegate_(view), state_(POSSIBLE) {}
+        : delegate_(view),
+          state_(POSSIBLE),
+          velocity_tracker_x_(nullptr),
+          velocity_tracker_y_(nullptr) {}
     
     State state() const {
         return state_;
@@ -50,7 +54,9 @@ public:
     }
     
     CGPoint velocity() const {
-        return CGPointZero;
+        const auto vx = fl_velocity_tracker_calculate_velocity(velocity_tracker_x_);
+        const auto vy = fl_velocity_tracker_calculate_velocity(velocity_tracker_y_);
+        return CGPointMake(vx, vy);
     }
     
     void begin_with_touches(NSSet<UITouch *> *touches) {
@@ -72,6 +78,7 @@ public:
             active_touch_ = touch;
         } else {
             state_ = BEGAN;
+            touch_begin_time_ = CACurrentMediaTime();
             active_touch_ = [touches firstObject];
             active_touch_begin_location_ = active_touch_location();
         }
@@ -92,6 +99,7 @@ public:
         state_ = cancelled ? CANCELLED : ENDED;
         add_current_location();
         [delegate_ _handlePan:*this];
+        state_ = POSSIBLE;
     }
     
     void reset() {
@@ -126,6 +134,7 @@ private:
     CGPoint previous_traslation_;
     UITouch *active_touch_;
     CGPoint active_touch_begin_location_;
+    CFTimeInterval touch_begin_time_;
     
     CGPoint touch_location(UITouch *touch) const {
         return [touch locationInView:delegate_.window];
@@ -142,10 +151,10 @@ private:
         if (velocity_tracker_y_ == nullptr) {
             velocity_tracker_y_ = fl_velocity_tracker_new(FL_VELOCITY_TRACKER_RECURRENCE_STRATEGY);
         }
-        const auto now = static_cast<float>(CACurrentMediaTime());
+        const auto now = static_cast<float>((CACurrentMediaTime() - touch_begin_time_) * 1e3);
         const auto trans = translation();
-        fl_velocity_tracker_add_data_point(velocity_tracker_x_, static_cast<float>(now), static_cast<float>(trans.x));
-        fl_velocity_tracker_add_data_point(velocity_tracker_y_, static_cast<float>(now), static_cast<float>(trans.y));
+        fl_velocity_tracker_add_data_point(velocity_tracker_x_, now, static_cast<float>(trans.x));
+        fl_velocity_tracker_add_data_point(velocity_tracker_y_, now, static_cast<float>(trans.y));
     }
 };
 
@@ -156,26 +165,37 @@ private:
 @implementation FSVScrollView {
     CADisplayLink *_displayLink;
     NSHashTable *_scrollObservers;
+    bool _isFirstLayout;
     
     FlScroller *_scrollerX;
     FlScroller *_scrollerY;
     FlSpringBack *_springBackX;
     FlSpringBack *_springBackY;
     
-    UIGestureRecognizerState _touchState;
-    CGFloat _touchBeganTime;
-    UITouch *_activeTouch;
     std::unique_ptr<TouchProxy> _touchProxy;
+    // Records the translation of the gesture's first response.
+    std::optional<CGPoint> _touchBeganTranslation;
     BOOL _isTracking;
     BOOL _isDragging;
+    bool _isDecelerating;
+    bool _isBouncing;
     
     CGPoint _lastContentOffset;
+    CGFloat _animationBeginTime;
+    CGPoint _animationBeginContentOffset;
+    CGPoint _animationBeginVelocity;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
+        _isFirstLayout = true;
+        _scrollerX = nullptr;
+        _scrollerY = nullptr;
+        _springBackX = nullptr;
+        _scrollerY = nullptr;
         _scrollObservers = [NSHashTable weakObjectsHashTable];
+        _decelerationRate = UIScrollViewDecelerationRateNormal;
     }
     return self;
 }
@@ -192,9 +212,7 @@ private:
     
     if (self.superview) {
         _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(_handleDisplayLinkFire:)];
-        if (@available(iOS 15.0, *)) {
-            _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(60, 120, 120);
-        }
+        _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(60, 120, 120);
         [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
     } else {
         [_displayLink invalidate];
@@ -205,8 +223,16 @@ private:
 - (void)layoutSubviews {
     [super layoutSubviews];
     
+    if (_isFirstLayout) {
+        const auto minimumContentOffset = self.minimumContentOffset;
+        _contentOffset = CGPointMake(
+            [self _canHorizontalScroll] ? minimumContentOffset.x : 0,
+            [self _canVerticalScroll] ? minimumContentOffset.y : 0
+        );
+        _isFirstLayout = false;
+    }
     const auto size = self.bounds.size;
-    self.bounds = CGRectMake(-_contentOffset.x, -_contentOffset.y, size.width, size.height);
+    self.bounds = CGRectMake(_contentOffset.x, _contentOffset.y, size.width, size.height);
 }
 
 - (BOOL)isMultipleTouchEnabled {
@@ -243,24 +269,43 @@ private:
 }
 
 - (void)_handlePan:(const TouchProxy &)proxy {
+    const auto canHorizontalScroll = [self _canHorizontalScroll];
+    const auto canVerticalScroll = [self _canVerticalScroll];
     switch (proxy.state()) {
         case TouchProxy::State::BEGAN:
             _isTracking = true;
+            _isDragging = false;
+            _isDecelerating = false;
+            _isBouncing = false;
             _lastContentOffset = _contentOffset;
+            _touchBeganTranslation = std::nullopt;
             break;
         case TouchProxy::State::CHANGED: {
             _isTracking = false;
             _isDragging = true;
-            const auto translation = proxy.translation();
-            std::cout << "(" << translation.x << ", " << translation.y << ")\n";
-            self.contentOffset = CGPointSub(_lastContentOffset, translation);
+            
+            auto translation = proxy.translation();
+            // There is a significant delay between the system calling `touchesBegan:withEvent:` and `touchesMoved:withEvent:`,
+            // which can cause large position jumps when responding to gesture.
+            // We use the translation of the first call to `touchesMoved:withEvent:` as a baseline to avoid this issue.
+            if (!_touchBeganTranslation.has_value()) {
+                _touchBeganTranslation = translation;
+            }
+            translation = CGPointSub(translation, *_touchBeganTranslation);
+            const auto x = canHorizontalScroll ? translation.x : 0;
+            const auto y = canVerticalScroll ? translation.y : 0;
+            self.contentOffset = CGPointMake(_lastContentOffset.x - x, _lastContentOffset.y - y);
         } break;
         case TouchProxy::State::ENDED:
         case TouchProxy::State::CANCELLED: {
+            _isDragging = false;
             auto velocity = proxy.velocity();
             if (fl_velocity_approaching_halt(velocity.x, velocity.y)) {
                 velocity = CGPointZero;
             }
+            if (!canHorizontalScroll) velocity.x = 0;
+            if (!canVerticalScroll) velocity.y = 0;
+            [self _handleEndPanWithVelocity:velocity];
         } break;
         default:
             break;
@@ -273,37 +318,104 @@ private:
     if (CGPointEqualToPoint(velocity, CGPointZero)) {
         return;
     }
+    
+    const auto contentOffset = _contentOffset;
+    const auto minContentOffset = self.minimumContentOffset;
+    const auto maxContentOffset = self.maximumContentOffset;
+    const auto outOfRangeX = contentOffset.x < minContentOffset.x || contentOffset.x > maxContentOffset.x;
+    const auto outOfRangeY = contentOffset.y < minContentOffset.y || contentOffset.y > maxContentOffset.y;
+    
+    _animationBeginVelocity = velocity;
+    _animationBeginContentOffset = _contentOffset;
+    _animationBeginTime = CACurrentMediaTime();
+    _isDecelerating = true;
 }
 
 - (void)_handleDisplayLinkFire:(CADisplayLink *)sender {
-    
+    const auto now = CACurrentMediaTime();
+    if (_isDecelerating) {
+        [self _prepareScrollers];
+        [self _updateScrollersDecelerationRate];
+        _isDecelerating = ![self _handleDeceleratingWithInterval:(now - _animationBeginTime) * 1e3];
+    }
+    if (_isBouncing) {
+        _isBouncing = ![self _handleBouncing];
+    }
+}
+
+- (bool)_handleDeceleratingWithInterval:(CFTimeInterval)interval {
+    bool finishX, finishY;
+    auto targetContentOffset = _animationBeginContentOffset;
+    const auto valueX = fl_scroller_value(_scrollerX, (float) interval, &finishX);
+    if (finishX) {
+        targetContentOffset.x = _contentOffset.x;
+    } else {
+        const auto offsetX = valueX.offset;
+        const auto velocityX = valueX.velocity;
+        targetContentOffset.x -= offsetX;
+    }
+    const auto valueY = fl_scroller_value(_scrollerY, (float) interval, &finishY);
+    if (finishY) {
+        targetContentOffset.y = _contentOffset.y;
+    } else {
+        const auto offsetY = valueY.offset;
+        const auto velocityY = valueY.velocity;
+        targetContentOffset.y -= offsetY;
+    }
+    self.contentOffset = targetContentOffset;
+    return finishX && finishY;
+}
+
+- (bool)_handleBouncing {
+    return true;
 }
 
 #pragma mark - Public Methods
 
 - (void)scrollToTop {
-    
+    if (![self _canVerticalScroll]) {
+        return;
+    }
 }
 
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer {
     [_scrollObservers addObject:observer];
 }
 
-#pragma mark - Private Methods
-
-- (CGPoint)_minimumContentOffset {
-    const auto adjustedContentInset = self.adjustedContentInset;
-    return CGPointMake(-adjustedContentInset.top, -adjustedContentInset.left);
+- (void)_prepareScrollers {
+    const auto vx = _animationBeginVelocity.x;
+    const auto vy = _animationBeginVelocity.y;
+    if (_scrollerX == nullptr) {
+        _scrollerX = new FlScroller;
+        fl_scroller_init(_scrollerX, (float) _decelerationRate);
+    }
+    fl_scroller_reset(_scrollerX);
+    fl_scroller_fling(_scrollerX, vx);
+    if (_scrollerY == nullptr) {
+        _scrollerY = new FlScroller;
+        fl_scroller_init(_scrollerY, (float) _decelerationRate);
+    }
+    fl_scroller_reset(_scrollerY);
+    fl_scroller_fling(_scrollerY, vy);
 }
 
-- (CGPoint)_maximumContentOffset {
-    const auto contentSize = _contentSize;
-    const auto viewSize = self.bounds.size;
-    const auto adjustedContentInset = self.adjustedContentInset;
-    return CGPointMake(
-        contentSize.width - viewSize.width - adjustedContentInset.right,
-        contentSize.height - viewSize.height - adjustedContentInset.bottom
-    );
+- (void)_updateScrollersDecelerationRate {
+    if (_scrollerX != nullptr) {
+        fl_scroller_set_deceleration_rate(_scrollerX, (float) _decelerationRate);
+    }
+    if (_scrollerY != nullptr) {
+        fl_scroller_set_deceleration_rate(_scrollerY, (float) _decelerationRate);
+    }
+}
+
+#pragma mark - Private Methods
+
+- (BOOL)_canHorizontalScroll {
+    return _alwaysBounceHorizontal || _contentSize.width > self.bounds.size.width;
+}
+
+- (BOOL)_canVerticalScroll {
+    return _alwaysBounceVertical || _contentSize.height > self.bounds.size.height;
 }
 
 - (void)_notifyScrollObservers {
@@ -334,5 +446,33 @@ private:
 - (UIEdgeInsets)adjustedContentInset {
     return UIEdgeInsetsAdd(_contentInsets, self.safeAreaInsets);
 }
+
+- (BOOL)isTracking {
+    return _isTracking;
+}
+
+- (BOOL)isDragging {
+    return _isDragging;
+}
+
+- (BOOL)isDecelerating {
+    return _isDecelerating || _isBouncing;
+}
+
+- (CGPoint)minimumContentOffset {
+    const auto adjustedContentInset = self.adjustedContentInset;
+    return CGPointMake(-adjustedContentInset.left, -adjustedContentInset.top);
+}
+
+- (CGPoint)maximumContentOffset {
+    const auto contentSize = _contentSize;
+    const auto viewSize = self.bounds.size;
+    const auto adjustedContentInset = self.adjustedContentInset;
+    return CGPointMake(
+        contentSize.width - viewSize.width - adjustedContentInset.right,
+        contentSize.height - viewSize.height - adjustedContentInset.bottom
+    );
+}
+
 
 @end

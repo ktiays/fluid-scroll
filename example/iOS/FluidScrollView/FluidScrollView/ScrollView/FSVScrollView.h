@@ -49,6 +49,22 @@ NS_SWIFT_NAME(FluidScrollView)
 /// The returned value is `YES` if user isn’t dragging the content but scrolling is still occurring.
 @property (nonatomic, readonly, getter=isDecelerating) BOOL decelerating;
 
+/// A Boolean value that determines whether bouncing always occurs when vertical scrolling reaches the end of the content.
+///
+/// The scroll view allows vertical dragging even if the content is smaller than the bounds of the scroll view.
+/// The default value is `NO`.
+@property (nonatomic, assign) BOOL alwaysBounceVertical;
+
+/// A Boolean value that determines whether bouncing always occurs when horizontal scrolling reaches the end of the content view.
+///
+/// The scroll view allows horizontal dragging even if the content is smaller than the bounds of the scroll view.
+/// The default value is `NO`.
+@property (nonatomic, assign) BOOL alwaysBounceHorizontal;
+
+@property (nonatomic, readonly) CGPoint minimumContentOffset;
+
+@property (nonatomic, readonly) CGPoint maximumContentOffset;
+
 - (void)scrollToTop;
 
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer NS_SWIFT_NAME(addScrollObserver(_:));
