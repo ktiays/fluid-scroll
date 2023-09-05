@@ -97,6 +97,9 @@ public:
     }
     
     void end_with_touches(NSSet<UITouch *> *touches, bool cancelled) {
+        if (![touches containsObject:active_touch_]) {
+            return;
+        }
         state_ = cancelled ? CANCELLED : ENDED;
         add_current_location();
         [delegate_ _handlePan:*this];
