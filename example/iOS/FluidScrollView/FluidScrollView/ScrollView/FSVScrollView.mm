@@ -319,15 +319,7 @@ private:
         return;
     }
     
-    const auto contentOffset = _contentOffset;
-    const auto minContentOffset = self.minimumContentOffset;
-    const auto maxContentOffset = self.maximumContentOffset;
-    const auto outOfRangeX = contentOffset.x < minContentOffset.x || contentOffset.x > maxContentOffset.x;
-    const auto outOfRangeY = contentOffset.y < minContentOffset.y || contentOffset.y > maxContentOffset.y;
-    
-    _animationBeginVelocity = velocity;
-    _animationBeginContentOffset = _contentOffset;
-    _animationBeginTime = CACurrentMediaTime();
+    [self _updateAnimationPropertiesWithVelocity:velocity];
     _isDecelerating = true;
 }
 
@@ -336,22 +328,32 @@ private:
     if (_isDecelerating) {
         [self _prepareScrollers];
         [self _updateScrollersDecelerationRate];
-        _isDecelerating = ![self _handleDeceleratingWithInterval:(now - _animationBeginTime) * 1e3];
+        CGPoint velocity;
+        _isDecelerating = ![self _handleDeceleratingWithInterval:(now - _animationBeginTime) * 1e3 finalVelocity:&velocity];
+        
+        if (_isDecelerating && [self _outOfRange]) {
+            _isDecelerating = false;
+            _isBouncing = true;
+            [self _updateAnimationPropertiesWithVelocity:velocity];
+        }
     }
     if (_isBouncing) {
-        _isBouncing = ![self _handleBouncing];
+        [self _prepareSpringBacks];
+        _isBouncing = ![self _handleBouncingWithInterval:(now - _animationBeginTime) * 1e3];
     }
 }
 
-- (bool)_handleDeceleratingWithInterval:(CFTimeInterval)interval {
+- (bool)_handleDeceleratingWithInterval:(CFTimeInterval)interval finalVelocity:(CGPoint *)velocityPointer {
     bool finishX, finishY;
     auto targetContentOffset = _animationBeginContentOffset;
+    CGFloat finalVelocityX = 0;
+    CGFloat finalVelocityY = 0;
     const auto valueX = fl_scroller_value(_scrollerX, (float) interval, &finishX);
     if (finishX) {
         targetContentOffset.x = _contentOffset.x;
     } else {
         const auto offsetX = valueX.offset;
-        const auto velocityX = valueX.velocity;
+        finalVelocityX = valueX.velocity;
         targetContentOffset.x -= offsetX;
     }
     const auto valueY = fl_scroller_value(_scrollerY, (float) interval, &finishY);
@@ -359,14 +361,17 @@ private:
         targetContentOffset.y = _contentOffset.y;
     } else {
         const auto offsetY = valueY.offset;
-        const auto velocityY = valueY.velocity;
+        finalVelocityY = valueY.velocity;
         targetContentOffset.y -= offsetY;
+    }
+    if (velocityPointer != nullptr) {
+        *velocityPointer = CGPointMake(finalVelocityX, finalVelocityY);
     }
     self.contentOffset = targetContentOffset;
     return finishX && finishY;
 }
 
-- (bool)_handleBouncing {
+- (bool)_handleBouncingWithInterval:(CFTimeInterval)interval {
     return true;
 }
 
@@ -381,6 +386,8 @@ private:
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer {
     [_scrollObservers addObject:observer];
 }
+
+#pragma mark - Private Methods
 
 - (void)_prepareScrollers {
     const auto vx = _animationBeginVelocity.x;
@@ -408,8 +415,6 @@ private:
     }
 }
 
-#pragma mark - Private Methods
-
 - (BOOL)_canHorizontalScroll {
     return _alwaysBounceHorizontal || _contentSize.width > self.bounds.size.width;
 }
@@ -424,6 +429,34 @@ private:
             [obj observeScrollViewDidScroll:self];
         }
     }];
+}
+
+- (BOOL)_outOfRange {
+    const auto contentOffset = _contentOffset;
+    const auto minContentOffset = self.minimumContentOffset;
+    const auto maxContentOffset = self.maximumContentOffset;
+    const auto outOfRangeX = (contentOffset.x < minContentOffset.x || contentOffset.x > maxContentOffset.x) && [self _canHorizontalScroll];
+    const auto outOfRangeY = (contentOffset.y < minContentOffset.y || contentOffset.y > maxContentOffset.y) && [self _canVerticalScroll];
+    return outOfRangeX || outOfRangeY;
+}
+
+- (void)_updateAnimationPropertiesWithVelocity:(CGPoint)velocity {
+    _animationBeginVelocity = velocity;
+    _animationBeginContentOffset = _contentOffset;
+    _animationBeginTime = CACurrentMediaTime();
+}
+
+- (void)_prepareSpringBacks {
+    if (_springBackX == nullptr) {
+        _springBackX = new FlSpringBack;
+        fl_spring_back_init(_springBackX);
+    }
+    fl_spring_back_reset(_springBackX);
+    if (_springBackY == nullptr) {
+        _springBackY = new FlSpringBack;
+        fl_spring_back_init(_springBackY);
+    }
+    fl_spring_back_reset(_springBackY);
 }
 
 #pragma mark - Getters & Setters
@@ -441,6 +474,14 @@ private:
 - (void)setContentInsets:(UIEdgeInsets)contentInsets {
     _contentInsets = contentInsets;
     [self setNeedsLayout];
+}
+
+- (void)setDecelerationRate:(UIScrollViewDecelerationRate)decelerationRate {
+    if (decelerationRate <= 0 || decelerationRate >= 1) {
+        _decelerationRate = UIScrollViewDecelerationRateNormal;
+    } else {
+        _decelerationRate = decelerationRate;
+    }
 }
 
 - (UIEdgeInsets)adjustedContentInset {
@@ -469,10 +510,9 @@ private:
     const auto viewSize = self.bounds.size;
     const auto adjustedContentInset = self.adjustedContentInset;
     return CGPointMake(
-        contentSize.width - viewSize.width - adjustedContentInset.right,
-        contentSize.height - viewSize.height - adjustedContentInset.bottom
+        contentSize.width - viewSize.width + adjustedContentInset.right,
+        contentSize.height - viewSize.height + adjustedContentInset.bottom
     );
 }
-
 
 @end
