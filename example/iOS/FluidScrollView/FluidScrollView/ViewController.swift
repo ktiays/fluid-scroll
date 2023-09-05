@@ -23,12 +23,6 @@ class ViewController: UIViewController {
         fluidScrollView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
-//        let view = UIScrollView()
-//        view.contentSize = .init(width: 1, height: 2000)
-//        self.view.addSubview(view)
-//        view.snp.makeConstraints { make in
-//            make.edges.equalToSuperview()
-//        }
         
         NotificationCenter.default.publisher(for: NSNotification.Name.fsvScollViewWillScrollToTop).sink { [unowned self] _ in
             fluidScrollView.scrollToTop()

@@ -155,6 +155,7 @@ private:
 
 @implementation FSVScrollView {
     CADisplayLink *_displayLink;
+    NSHashTable *_scrollObservers;
     
     FlScroller *_scrollerX;
     FlScroller *_scrollerY;
@@ -165,8 +166,10 @@ private:
     CGFloat _touchBeganTime;
     UITouch *_activeTouch;
     std::unique_ptr<TouchProxy> _touchProxy;
+    BOOL _isTracking;
+    BOOL _isDragging;
     
-    NSHashTable *_scrollObservers;
+    CGPoint _lastContentOffset;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -242,14 +245,23 @@ private:
 - (void)_handlePan:(const TouchProxy &)proxy {
     switch (proxy.state()) {
         case TouchProxy::State::BEGAN:
+            _isTracking = true;
+            _lastContentOffset = _contentOffset;
             break;
         case TouchProxy::State::CHANGED: {
+            _isTracking = false;
+            _isDragging = true;
             const auto translation = proxy.translation();
             std::cout << "(" << translation.x << ", " << translation.y << ")\n";
+            self.contentOffset = CGPointSub(_lastContentOffset, translation);
         } break;
         case TouchProxy::State::ENDED:
-        case TouchProxy::State::CANCELLED:
-            break;
+        case TouchProxy::State::CANCELLED: {
+            auto velocity = proxy.velocity();
+            if (fl_velocity_approaching_halt(velocity.x, velocity.y)) {
+                velocity = CGPointZero;
+            }
+        } break;
         default:
             break;
     }
