@@ -16,6 +16,18 @@
 #import "CGPointMath.h"
 #import "UIEdgeInsetsMath.h"
 
+#define FSV_DIRECT __attribute__((objc_direct))
+
+#define AXIS_HANDLER(__X, __Y, __D) \
+    switch (axis) { \
+        case UIAxisHorizontal: \
+            return __X; \
+        case UIAxisVertical: \
+            return __Y; \
+        default: \
+            return __D; \
+    }
+
 template <typename T>
 static void safeDelete(T *ptr) {
     if (ptr != nullptr) {
@@ -32,6 +44,15 @@ static T signum(T x) {
     } else {
         return 0;
     }
+}
+
+static CGFloat CGPointValue(CGPoint point, UIAxis axis) {
+    AXIS_HANDLER(point.x, point.y, 0);
+}
+
+static void     enumerate_axes(void (^action)(UIAxis axis)) {
+    action(UIAxisHorizontal);
+    action(UIAxisVertical);
 }
 
 struct TouchProxy;
@@ -179,6 +200,65 @@ enum class _BounceEdge {
     MIN, MAX
 };
 
+struct _ScrollProperties {
+public:
+    bool is_decelerating = false;
+    bool is_bouncing = false;
+    
+    _BounceEdge bounce_edge = _BounceEdge::NONE;
+    
+    CGFloat animation_begin_time = 0;
+    CGFloat animation_begin_offset = 0;
+    CGFloat animation_begin_velocity = 0;
+    
+    FlScroller *scroller = nullptr;
+    FlSpringBack *spring_back = nullptr;
+    
+    void clear() {
+        is_decelerating = false;
+        is_bouncing = false;
+        bounce_edge = _BounceEdge::NONE;
+        animation_begin_time = 0;
+        animation_begin_offset = 0;
+        animation_begin_velocity = 0;
+    }
+    
+    void reset(CGFloat velocity, CGFloat offset) {
+        if (scroller != nullptr) {
+            fl_scroller_reset(scroller);
+        }
+        if (spring_back != nullptr) {
+            fl_spring_back_reset(spring_back);
+        }
+        
+        animation_begin_offset = offset;
+        animation_begin_time = CACurrentMediaTime();
+        animation_begin_velocity = velocity;
+    }
+    
+    void prepare_scroller(UIScrollViewDecelerationRate rate) {
+        if (scroller == nullptr) {
+            scroller = new FlScroller;
+            fl_scroller_init(scroller, (float) rate);
+        }
+        fl_scroller_set_deceleration_rate(scroller, rate);
+    }
+    
+    void prepare_spring_back() {
+        if (spring_back == nullptr) {
+            spring_back = new FlSpringBack;
+            fl_spring_back_init(spring_back);
+        }
+    }
+    
+    ~_ScrollProperties() {
+        safeDelete(scroller);
+        safeDelete(spring_back);
+    }
+};
+
+#define GET_AXIS_PROPERTIES const auto properties = [self _scrollPropertiesForAxis:axis]
+
 @interface FSVScrollView () <_FSVTouchDelegate>
 
 @end
@@ -189,25 +269,15 @@ enum class _BounceEdge {
     bool _isFirstLayout;
     void (^_scrollsToTopAnimationCallback)(void);
     
-    FlScroller *_scrollerX;
-    FlScroller *_scrollerY;
-    FlSpringBack *_springBackX;
-    FlSpringBack *_springBackY;
-    
     std::unique_ptr<TouchProxy> _touchProxy;
     // Records the translation of the gesture's first response.
     std::optional<CGPoint> _touchBeganTranslation;
     BOOL _isTracking;
     BOOL _isDragging;
-    bool _isDecelerating;
-    bool _isBouncing;
-    _BounceEdge _bounceEdgeX;
-    _BounceEdge _bounceEdgeY;
-    
     CGPoint _lastContentOffset;
-    CGFloat _animationBeginTime;
-    CGPoint _animationBeginContentOffset;
-    CGPoint _animationBeginVelocity;
+    
+    std::shared_ptr<_ScrollProperties> _propertiesX;
+    std::shared_ptr<_ScrollProperties> _propertiesY;
     
     CGPoint _cachedMinimumContentOffset;
     CGPoint _cachedMaximumContentOffset;
@@ -218,24 +288,13 @@ enum class _BounceEdge {
     self = [super initWithFrame:frame];
     if (self) {
         _isFirstLayout = true;
-        _scrollerX = nullptr;
-        _scrollerY = nullptr;
-        _springBackX = nullptr;
-        _scrollerY = nullptr;
-        _bounceEdgeX = _BounceEdge::NONE;
-        _bounceEdgeY = _BounceEdge::NONE;
         _scrollObservers = [NSHashTable weakObjectsHashTable];
         _decelerationRate = UIScrollViewDecelerationRateNormal;
         _isCachedMinMaxContentOffsetInvalid = true;
+        _propertiesX = std::make_shared<_ScrollProperties>();
+        _propertiesY = std::make_shared<_ScrollProperties>();
     }
     return self;
-}
-
-- (void)dealloc {
-    safeDelete(_scrollerX);
-    safeDelete(_scrollerY);
-    safeDelete(_springBackX);
-    safeDelete(_springBackY);
 }
 
 - (void)didMoveToSuperview {
@@ -311,11 +370,9 @@ enum class _BounceEdge {
         case TouchProxy::State::BEGAN:
             _isTracking = true;
             _isDragging = false;
-            _isDecelerating = false;
-            _isBouncing = false;
+            _propertiesX->clear();
+            _propertiesY->clear();
             _scrollsToTopAnimationCallback = nil;
-            _bounceEdgeX = _BounceEdge::NONE;
-            _bounceEdgeY = _BounceEdge::NONE;
             _lastContentOffset.x = [self _rubberBandForOffset:_contentOffset.x
                                                     minOffset:minContentOffset.x
                                                     maxOffset:maxContentOffset.x
@@ -375,134 +432,129 @@ enum class _BounceEdge {
 
 #pragma mark - Actions
 
-- (void)_handleEndPanWithVelocity:(CGPoint)velocity {
-    if ([self _outOfRange]) {
-        [self _prepareBouncingWithVelocity:velocity overflowVelocity:true];
-        return;
-    }
-    
-    if (CGPointEqualToPoint(velocity, CGPointZero)) {
-        return;
-    }
-    
-    [self _updateAnimationPropertiesWithVelocity:velocity];
-    [self _prepareScrollers];
-    [self _updateScrollersDecelerationRate];
-    _isDecelerating = true;
+- (void)_handleEndPanWithVelocity:(CGPoint)velocity FSV_DIRECT {
+    enumerate_axes(^(UIAxis axis) {
+        const auto v = CGPointValue(velocity, axis);
+        GET_AXIS_PROPERTIES;
+        const auto overflow = [self _overflowOffsetForAxis:axis];
+        if (overflow != 0) {
+            [self _prepareBouncingWithVelocity:v overflowVelocity:true axis:axis];
+            return;
+        }
+        
+        if (v != 0) {
+            properties->prepare_scroller(self->_decelerationRate);
+            properties->reset(v, [self _offsetForAxis:axis]);
+            fl_scroller_fling(properties->scroller, v);
+            properties->is_decelerating = true;
+        }
+    });
 }
 
 - (void)_handleDisplayLinkFire:(CADisplayLink *)sender {
-    if (_isDecelerating) {
-        CGPoint velocity;
-        _isDecelerating = ![self _handleDeceleratingWithInterval:(CACurrentMediaTime() - _animationBeginTime) * 1e3 finalVelocity:&velocity];
-        if (_isDecelerating && [self _outOfRange]) {
-            _isDecelerating = false;
-            [self _prepareBouncingWithVelocity:velocity overflowVelocity:false];
-        }
-    }
-    if (_isBouncing) {
-        _isBouncing = ![self _handleBouncingWithInterval:(CACurrentMediaTime() - _animationBeginTime) * 1e3];
-        if (!_isBouncing) {
-            if (_scrollsToTopAnimationCallback) {
-                _scrollsToTopAnimationCallback();
-                _scrollsToTopAnimationCallback = nil;
+    enumerate_axes(^(UIAxis axis) {
+        GET_AXIS_PROPERTIES;
+        
+        if (properties->is_decelerating) {
+            const auto interval = (CACurrentMediaTime() - properties->animation_begin_time) * 1e3;
+            CGFloat velocity;
+            properties->is_decelerating = ![self _handleDeceleratingWithInterval:interval finalVelocity:&velocity axis:axis];
+            
+            const auto overflow = [self _overflowOffsetForAxis:axis];
+            if (properties->is_decelerating && overflow != 0) {
+                properties->is_decelerating = false;
+                [self _prepareBouncingWithVelocity:velocity overflowVelocity:false axis:axis];
             }
+            [self setNeedsLayout];
         }
-    }
+        
+        if (properties->is_bouncing) {
+            const auto interval = (CACurrentMediaTime() - properties->animation_begin_time) * 1e3;
+            properties->is_bouncing = ![self _handleBouncingWithInterval:interval axis:axis];
+            if (!properties->is_bouncing && axis == UIAxisVertical) {
+                if (self->_scrollsToTopAnimationCallback) {
+                    self->_scrollsToTopAnimationCallback();
+                    self->_scrollsToTopAnimationCallback = nil;
+                }
+            }
+            [self setNeedsLayout];
+        }
+    });
 }
 
-- (bool)_handleDeceleratingWithInterval:(CFTimeInterval)interval finalVelocity:(CGPoint *)velocityPointer {
-    bool finishX, finishY;
-    auto targetContentOffset = _contentOffset;
-    CGFloat finalVelocityX = 0;
-    CGFloat finalVelocityY = 0;
-    const auto valueX = fl_scroller_value(_scrollerX, (float) interval, &finishX);
-    if (!finishX) {
-        const auto offsetX = valueX.offset;
-        finalVelocityX = valueX.velocity;
-        targetContentOffset.x = _animationBeginContentOffset.x - offsetX;
-    }
-    const auto valueY = fl_scroller_value(_scrollerY, (float) interval, &finishY);
-    if (!finishY) {
-        const auto offsetY = valueY.offset;
-        finalVelocityY = valueY.velocity;
-        targetContentOffset.y = _animationBeginContentOffset.y - offsetY;
+- (bool)_handleDeceleratingWithInterval:(CFTimeInterval)interval finalVelocity:(CGFloat *)velocityPointer axis:(UIAxis)axis FSV_DIRECT {
+    GET_AXIS_PROPERTIES;
+    bool finish = false;
+    auto targetOffset = [self _offsetForAxis:axis];
+    CGFloat finalVelocity = 0;
+    const auto value = fl_scroller_value(properties->scroller, (float) interval, &finish);
+    if (!finish) {
+        const auto offset = value.offset;
+        finalVelocity = value.velocity;
+        targetOffset = properties->animation_begin_offset - offset;
     }
     if (velocityPointer != nullptr) {
-        *velocityPointer = CGPointMake(finalVelocityX, finalVelocityY);
+        *velocityPointer = finalVelocity;
     }
-    self.contentOffset = targetContentOffset;
-    return finishX && finishY;
+    [self _setContentOffsetValue:targetOffset forAxis:axis];
+    return finish;
 }
 
-- (void)_prepareBouncingWithVelocity:(CGPoint)velocity overflowVelocity:(bool)overflowVelocity {
+- (void)_prepareBouncingWithVelocity:(CGFloat)velocity overflowVelocity:(bool)overflowVelocity axis:(UIAxis)axis FSV_DIRECT {
+    GET_AXIS_PROPERTIES;
     // Divide the overflow distance by 100 as the initial bounce velocity of the current position.
-    const auto outVelocityX = [self _outOfRangeX] / 100;
-    const auto outVelocityY = [self _outOfRangeY] / 100;
-    assert(outVelocityX != 0 || outVelocityY != 0);
+    const auto overV = [self _overflowOffsetForAxis:axis] / 100;
+    assert(overV != 0);
     
     if (overflowVelocity) {
-        if (std::signbit(outVelocityX) != std::signbit(velocity.x)) {
-            velocity.x += outVelocityX;
+        if (std::signbit(overV) != std::signbit(velocity)) {
+            velocity += overV;
         } else {
-            velocity.x = outVelocityX;
-        }
-        if (std::signbit(outVelocityY) != std::signbit(velocity.y)) {
-            velocity.y += outVelocityY;
-        } else {
-            velocity.y = outVelocityY;
+            velocity = overV;
         }
     }
     
-    [self _updateAnimationPropertiesWithVelocity:velocity];
-    [self _prepareSpringBacks];
-    _isBouncing = true;
+    properties->prepare_spring_back();
+    properties->reset(velocity, 0);
     
-    const auto minContentOffset = self.minimumContentOffset;
-    const auto maxContentOffset = self.maximumContentOffset;
+    const auto minOffset = [self _minimumOffsetForAxis:axis];
+    const auto maxContentOffset = [self _maximumOffsetForAxis:axis];
     
-    CGPoint targetOffset = CGPointZero;
-    if (outVelocityX < 0) {
-        _bounceEdgeX = _BounceEdge::MIN;
-        targetOffset.x = minContentOffset.x;
-    } else if (outVelocityX > 0) {
-        _bounceEdgeX = _BounceEdge::MAX;
-        targetOffset.x = maxContentOffset.x;
+    CGFloat targetOffset = 0;
+    if (overV < 0) {
+        properties->bounce_edge = _BounceEdge::MIN;
+        targetOffset = minOffset;
+    } else if (overV > 0) {
+        properties->bounce_edge = _BounceEdge::MAX;
+        targetOffset = maxContentOffset;
     }
-    if (outVelocityY < 0) {
-        _bounceEdgeY = _BounceEdge::MIN;
-        targetOffset.y = minContentOffset.y;
-    } else if (outVelocityY > 0) {
-        _bounceEdgeY = _BounceEdge::MAX;
-        targetOffset.y = maxContentOffset.y;
+    if (properties->bounce_edge != _BounceEdge::NONE) {
+        fl_spring_back_absorb(properties->spring_back, velocity, targetOffset - [self _offsetForAxis:axis]);
+        properties->is_bouncing = true;
     }
-    if (_bounceEdgeX != _BounceEdge::NONE)
-        fl_spring_back_absorb(_springBackX, velocity.x, targetOffset.x - _contentOffset.x);
-    if (_bounceEdgeY != _BounceEdge::NONE)
-        fl_spring_back_absorb(_springBackY, velocity.y, targetOffset.y - _contentOffset.y);
 }
 
-- (bool)_handleBouncingWithInterval:(CFTimeInterval)interval {
-    const auto minContentOffset = self.minimumContentOffset;
-    const auto maxContentOffset = self.maximumContentOffset;
-    CGPoint targetContentOffset = _contentOffset;
-    bool finishX = true;
-    bool finishY = true;
-    if (_bounceEdgeX != _BounceEdge::NONE) {
-        const auto target = _bounceEdgeX == _BounceEdge::MIN ? minContentOffset.x : maxContentOffset.x;
-        const auto offset = fl_spring_back_value(_springBackX, interval, &finishX);
-        targetContentOffset.x = target - offset;
+- (bool)_handleBouncingWithInterval:(CFTimeInterval)interval axis:(UIAxis)axis FSV_DIRECT {
+    GET_AXIS_PROPERTIES;
+    
+    const auto minContentOffset = [self _minimumOffsetForAxis:axis];
+    const auto maxContentOffset = [self _maximumOffsetForAxis:axis];
+    CGFloat targetContentOffset = [self _offsetForAxis:axis];
+    bool finish = true;
+    if (properties->bounce_edge != _BounceEdge::NONE) {
+        const auto target = properties->bounce_edge == _BounceEdge::MIN ? minContentOffset : maxContentOffset;
+        const auto offset = fl_spring_back_value(properties->spring_back, interval, &finish);
+        targetContentOffset = target - offset;
     }
-    if (_bounceEdgeY != _BounceEdge::NONE) {
-        const auto target = _bounceEdgeY == _BounceEdge::MIN ? minContentOffset.y : maxContentOffset.y;
-        const auto offset = fl_spring_back_value(_springBackY, interval, &finishY);
-        targetContentOffset.y = target - offset;
-    }
-    self.contentOffset = targetContentOffset;
-    return finishX && finishY;
+    [self _setContentOffsetValue:targetContentOffset forAxis:axis];
+    return finish;
 }
 
-- (CGFloat)_rubberBandForOffset:(CGFloat)offset minOffset:(CGFloat)minOffset maxOffset:(CGFloat)maxOffset range:(CGFloat)range inverse:(bool)inverse {
+- (CGFloat)_rubberBandForOffset:(CGFloat)offset 
+                      minOffset:(CGFloat)minOffset
+                      maxOffset:(CGFloat)maxOffset
+                          range:(CGFloat)range
+                        inverse:(bool)inverse FSV_DIRECT {
     if (std::abs(range) < CGFLOAT_EPSILON) {
         return offset;
     }
@@ -521,6 +573,19 @@ enum class _BounceEdge {
     return target + transformed * signum(distance);
 }
 
+- (void)_setContentOffsetValue:(CGFloat)value forAxis:(UIAxis)axis FSV_DIRECT {
+    switch (axis) {
+        case UIAxisHorizontal:
+            _contentOffset.x = value;
+            break;
+        case UIAxisVertical:
+            _contentOffset.y = value;
+            break;
+        default:
+            break;
+    }
+}
+
 #pragma mark - Public Methods
 
 - (void)scrollsToTopWithCompletionHandler:(void (^)(void))completionHandler {
@@ -530,7 +595,6 @@ enum class _BounceEdge {
     _scrollsToTopAnimationCallback = completionHandler;
     _isDragging = false;
     _isTracking = false;
-    _isBouncing = true;
     
 //    [self _updateAnimationPropertiesWithVelocity:velocity];
 //    [self _prepareSpringBacks];
@@ -544,41 +608,15 @@ enum class _BounceEdge {
 
 #pragma mark - Private Methods
 
-- (void)_prepareScrollers {
-    const auto vx = _animationBeginVelocity.x;
-    const auto vy = _animationBeginVelocity.y;
-    if (_scrollerX == nullptr) {
-        _scrollerX = new FlScroller;
-        fl_scroller_init(_scrollerX, (float) _decelerationRate);
-    }
-    fl_scroller_reset(_scrollerX);
-    fl_scroller_fling(_scrollerX, vx);
-    if (_scrollerY == nullptr) {
-        _scrollerY = new FlScroller;
-        fl_scroller_init(_scrollerY, (float) _decelerationRate);
-    }
-    fl_scroller_reset(_scrollerY);
-    fl_scroller_fling(_scrollerY, vy);
-}
-
-- (void)_updateScrollersDecelerationRate {
-    if (_scrollerX != nullptr) {
-        fl_scroller_set_deceleration_rate(_scrollerX, (float) _decelerationRate);
-    }
-    if (_scrollerY != nullptr) {
-        fl_scroller_set_deceleration_rate(_scrollerY, (float) _decelerationRate);
-    }
-}
-
-- (BOOL)_canHorizontalScroll {
+- (BOOL)_canHorizontalScroll FSV_DIRECT {
     return _alwaysBounceHorizontal || _contentSize.width > self.bounds.size.width;
 }
 
-- (BOOL)_canVerticalScroll {
+- (BOOL)_canVerticalScroll FSV_DIRECT {
     return _alwaysBounceVertical || _contentSize.height > self.bounds.size.height;
 }
 
-- (void)_notifyScrollObservers {
+- (void)_notifyScrollObservers FSV_DIRECT {
     auto enumerator = [_scrollObservers objectEnumerator];
     id<FSVScrollViewScrollObserver> observer;
     while (observer = [enumerator nextObject]) {
@@ -588,61 +626,42 @@ enum class _BounceEdge {
     }
 }
 
-- (CGFloat)_outOfRangeX {
-    if (![self _canHorizontalScroll]) {
+- (CGFloat)_overflowOffsetForAxis:(UIAxis)axis FSV_DIRECT {
+    if (![self _canScrollForAxis:axis]) {
         return 0;
     }
-    const auto contentOffset = _contentOffset;
-    const auto minContentOffset = self.minimumContentOffset;
-    const auto maxContentOffset = self.maximumContentOffset;
-    if (contentOffset.x < minContentOffset.x) {
-        return contentOffset.x - minContentOffset.x;
-    } else if (contentOffset.x > maxContentOffset.x) {
-        return contentOffset.x - maxContentOffset.x;
+    const auto offset = [self _offsetForAxis:axis];
+    const auto minOffset = [self _minimumOffsetForAxis:axis];
+    const auto maxOffset = [self _maximumOffsetForAxis:axis];
+    if (offset < minOffset) {
+        return offset - minOffset;
+    } else if (offset > maxOffset) {
+        return offset - maxOffset;
     } else {
         return 0;
     }
 }
 
-- (CGFloat)_outOfRangeY {
-    if (![self _canVerticalScroll]) {
-        return 0;
-    }
-    const auto contentOffset = _contentOffset;
-    const auto minContentOffset = self.minimumContentOffset;
-    const auto maxContentOffset = self.maximumContentOffset;
-    if (contentOffset.y < minContentOffset.y) {
-        return contentOffset.y - minContentOffset.y;
-    } else if (contentOffset.y > maxContentOffset.y) {
-        return contentOffset.y - maxContentOffset.y;
-    } else {
-        return 0;
-    }
+- (std::shared_ptr<_ScrollProperties>)_scrollPropertiesForAxis:(UIAxis)axis FSV_DIRECT {
+    AXIS_HANDLER(_propertiesX, _propertiesY, nullptr);
 }
 
-- (BOOL)_outOfRange {
-    return [self _outOfRangeY] != 0 || [self _outOfRangeY] != 0;
+- (CGFloat)_offsetForAxis:(UIAxis)axis FSV_DIRECT {
+    AXIS_HANDLER(_contentOffset.x, _contentOffset.y, 0);
 }
 
-- (void)_updateAnimationPropertiesWithVelocity:(CGPoint)velocity {
-    _animationBeginVelocity = velocity;
-    _animationBeginContentOffset = _contentOffset;
-    _animationBeginTime = CACurrentMediaTime();
-    _bounceEdgeX = _BounceEdge::NONE;
-    _bounceEdgeY = _BounceEdge::NONE;
+- (CGFloat)_minimumOffsetForAxis:(UIAxis)axis FSV_DIRECT {
+    const auto min = [self minimumContentOffset];
+    AXIS_HANDLER(min.x, min.y, 0);
 }
 
-- (void)_prepareSpringBacks {
-    if (_springBackX == nullptr) {
-        _springBackX = new FlSpringBack;
-        fl_spring_back_init(_springBackX);
-    }
-    fl_spring_back_reset(_springBackX);
-    if (_springBackY == nullptr) {
-        _springBackY = new FlSpringBack;
-        fl_spring_back_init(_springBackY);
-    }
-    fl_spring_back_reset(_springBackY);
+- (CGFloat)_maximumOffsetForAxis:(UIAxis)axis FSV_DIRECT {
+    const auto max = [self maximumContentOffset];
+    AXIS_HANDLER(max.x, max.y, 0);
+}
+
+- (bool)_canScrollForAxis:(UIAxis)axis FSV_DIRECT {
+    AXIS_HANDLER([self _canHorizontalScroll], [self _canVerticalScroll], false);
 }
 
 #pragma mark - Getters & Setters
@@ -686,7 +705,12 @@ enum class _BounceEdge {
 }
 
 - (BOOL)isDecelerating {
-    return _isDecelerating || _isBouncing;
+    __block bool result = false;
+    enumerate_axes(^(UIAxis axis) {
+        GET_AXIS_PROPERTIES;
+        result |= properties->is_decelerating || properties->is_bouncing;
+    });
+    return result;
 }
 
 - (CGPoint)minimumContentOffset {
@@ -705,7 +729,7 @@ enum class _BounceEdge {
     return _cachedMaximumContentOffset;
 }
 
-- (void)_updateCachedMinMaxContentOffset {
+- (void)_updateCachedMinMaxContentOffset FSV_DIRECT {
     const auto contentSize = _contentSize;
     const auto viewSize = self.bounds.size;
     const auto adjustedContentInset = self.adjustedContentInset;
