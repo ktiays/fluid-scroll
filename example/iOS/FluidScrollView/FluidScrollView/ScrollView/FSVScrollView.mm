@@ -268,6 +268,7 @@ public:
     NSHashTable *_scrollObservers;
     bool _isFirstLayout;
     void (^_scrollsToTopAnimationCallback)(void);
+    bool _ignoreScrollObserver;
     
     std::unique_ptr<TouchProxy> _touchProxy;
     // Records the translation of the gesture's first response.
@@ -373,6 +374,7 @@ public:
             _propertiesX->clear();
             _propertiesY->clear();
             _scrollsToTopAnimationCallback = nil;
+            _ignoreScrollObserver = false;
             _lastContentOffset.x = [self _rubberBandForOffset:_contentOffset.x
                                                     minOffset:minContentOffset.x
                                                     maxOffset:maxContentOffset.x
@@ -465,19 +467,26 @@ public:
                 properties->is_decelerating = false;
                 [self _prepareBouncingWithVelocity:velocity overflowVelocity:false axis:axis];
             }
-            [self setNeedsLayout];
+            [self _setNeedsLayoutWithNotify];
         }
         
         if (properties->is_bouncing) {
             const auto interval = (CACurrentMediaTime() - properties->animation_begin_time) * 1e3;
             properties->is_bouncing = ![self _handleBouncingWithInterval:interval axis:axis];
-            if (!properties->is_bouncing && axis == UIAxisVertical) {
+            if (axis == UIAxisVertical) {
                 if (self->_scrollsToTopAnimationCallback) {
-                    self->_scrollsToTopAnimationCallback();
-                    self->_scrollsToTopAnimationCallback = nil;
+                    const auto offset = [self _offsetForAxis:axis];
+                    const auto minOffset = [self _minimumOffsetForAxis:axis];
+                    if (std::abs(offset - minOffset) <= 2) {
+                        self->_scrollsToTopAnimationCallback();
+                        self->_scrollsToTopAnimationCallback = nil;
+                    }
+                }
+                if (!properties->is_bouncing) {
+                    self->_ignoreScrollObserver = false;
                 }
             }
-            [self setNeedsLayout];
+            [self _setNeedsLayoutWithNotify];
         }
     });
 }
@@ -504,8 +513,6 @@ public:
     GET_AXIS_PROPERTIES;
     // Divide the overflow distance by 100 as the initial bounce velocity of the current position.
     const auto overV = [self _overflowOffsetForAxis:axis] / 100;
-    assert(overV != 0);
-    
     if (overflowVelocity) {
         if (std::signbit(overV) != std::signbit(velocity)) {
             velocity += overV;
@@ -596,10 +603,19 @@ public:
     _isDragging = false;
     _isTracking = false;
     
-//    [self _updateAnimationPropertiesWithVelocity:velocity];
-//    [self _prepareSpringBacks];
-//    if (_bounceEdgeY != _BounceEdge::NONE)
-//        fl_spring_back_absorb(_springBackY, velocity.y, self.minimumContentOffset.y - _contentOffset.y);
+    const auto currentOffset = _contentOffset.y;
+    const auto distance = currentOffset - self.minimumContentOffset.y;
+    if (distance > 0) {
+        const auto properties = [self _scrollPropertiesForAxis:UIAxisVertical];
+        properties->is_decelerating = false;
+        const auto velocity = distance / 100;
+        properties->prepare_spring_back();
+        properties->reset(velocity, currentOffset);
+        properties->bounce_edge = _BounceEdge::MIN;
+        fl_spring_back_absorb(properties->spring_back, velocity, -distance);
+        properties->is_bouncing = true;
+        _ignoreScrollObserver = true;
+    }
 }
 
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer {
@@ -662,6 +678,13 @@ public:
 
 - (bool)_canScrollForAxis:(UIAxis)axis FSV_DIRECT {
     AXIS_HANDLER([self _canHorizontalScroll], [self _canVerticalScroll], false);
+}
+
+- (void)_setNeedsLayoutWithNotify FSV_DIRECT {
+    [self setNeedsLayout];
+    if (!_ignoreScrollObserver) {
+        [self _notifyScrollObservers];
+    }
 }
 
 #pragma mark - Getters & Setters

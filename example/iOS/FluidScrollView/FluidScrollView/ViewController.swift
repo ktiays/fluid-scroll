@@ -17,6 +17,7 @@ class ViewController: UIViewController {
     private var isContentViewLayout: Bool = false
     
     private var isNavigationBarEffectVisible: Bool = false
+    private var cachedNavigationBarEffectViews: [UIView] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -37,9 +38,12 @@ class ViewController: UIViewController {
             make.leading.trailing.equalTo(view.safeAreaLayoutGuide)
         }
         
+        updateCachedViews()
+        
         NotificationCenter.default.publisher(for: NSNotification.Name.fsvScollViewWillScrollToTop).sink { [unowned self] _ in
-            fluidScrollView.scrollsToTop {
-                
+            fluidScrollView.scrollsToTop { [unowned self] in
+                updateViewsVisibility(visible: false, animated: true)
+                isNavigationBarEffectVisible = false
             }
         }.store(in: &cancellables)
     }
@@ -57,16 +61,27 @@ class ViewController: UIViewController {
     
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
-        _updateNavigatonBarEffect(visible: isNavigationBarEffectVisible, animated: false)
+        updateCachedViews()
+        updateViewsVisibility(visible: isNavigationBarEffectVisible)
     }
     
-    private func updateNavigationBarEffect(visible: Bool, animated: Bool = false) {
-        if visible == isNavigationBarEffectVisible { return }
-        _updateNavigatonBarEffect(visible: visible, animated: animated)
+    private func updateViewsVisibility(visible: Bool, animated: Bool = false) {
         isNavigationBarEffectVisible = visible
+        let alpha: CGFloat = visible ? 1 : 0
+        if animated {
+            UIView.animate(withDuration: 0.4) { [self] in
+                cachedNavigationBarEffectViews.forEach {
+                    $0.alpha = alpha
+                }
+            }
+        } else {
+            cachedNavigationBarEffectViews.forEach {
+                $0.alpha = alpha
+            }
+        }
     }
     
-    private func _updateNavigatonBarEffect(visible: Bool, animated: Bool) {
+    private func updateCachedViews() {
         guard let navigationBar = self.navigationController?.navigationBar else { return }
         guard let barBackground = navigationBar.subviews.first else { return }
         if !barBackground.isKind(of: NSClassFromString("_UIBarBackground")!) { return }
@@ -81,19 +96,7 @@ class ViewController: UIViewController {
                 viewsNeedChangeAlpha.append(subview)
             }
         }
-        
-        let alpha: CGFloat = visible ? 1 : 0
-        if animated {
-            UIView.animate(withDuration: 0.4) {
-                viewsNeedChangeAlpha.forEach {
-                    $0.alpha = alpha
-                }
-            }
-        } else {
-            viewsNeedChangeAlpha.forEach {
-                $0.alpha = alpha
-            }
-        }
+        cachedNavigationBarEffectViews = viewsNeedChangeAlpha
     }
 
 }
@@ -102,6 +105,6 @@ extension ViewController: FSVScrollViewScrollObserver {
     func observeScrollViewDidScroll(_ scrollView: FluidScrollView) {
         let offsetY = scrollView.contentOffset.y
         let minOffsetY = scrollView.minimumContentOffset.y
-        updateNavigationBarEffect(visible: offsetY > minOffsetY)
+        updateViewsVisibility(visible: offsetY > minOffsetY)
     }
 }
