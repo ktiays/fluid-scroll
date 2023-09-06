@@ -35,7 +35,7 @@ impl SpringBack {
         let velocity = self.velocity_at(time);
         // The velocity threshold is in units of pixels per millisecond.
         // We need to convert velocity to match the unit.
-        if offset.abs() < VALUE_THRESHOLD && velocity.abs() * 1e3 < VELOCITY_THRESHOLD {
+        if offset.abs() < VALUE_THRESHOLD || velocity.abs() * 1e3 < VELOCITY_THRESHOLD {
             None
         } else {
             Some(offset)

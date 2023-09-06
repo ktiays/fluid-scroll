@@ -37,7 +37,9 @@ class ViewController: UIViewController {
         }
         
         NotificationCenter.default.publisher(for: NSNotification.Name.fsvScollViewWillScrollToTop).sink { [unowned self] _ in
-            fluidScrollView.scrollToTop()
+            fluidScrollView.scrollsToTop {
+                
+            }
         }.store(in: &cancellables)
     }
     
@@ -52,9 +54,18 @@ class ViewController: UIViewController {
         }
     }
     
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        _updateNavigatonBarEffect(visible: isNavigationBarEffectVisible, animated: false)
+    }
+    
     private func updateNavigationBarEffect(visible: Bool, animated: Bool = false) {
         if visible == isNavigationBarEffectVisible { return }
-        
+        _updateNavigatonBarEffect(visible: visible, animated: animated)
+        isNavigationBarEffectVisible = visible
+    }
+    
+    private func _updateNavigatonBarEffect(visible: Bool, animated: Bool) {
         guard let navigationBar = self.navigationController?.navigationBar else { return }
         guard let barBackground = navigationBar.subviews.first else { return }
         if !barBackground.isKind(of: NSClassFromString("_UIBarBackground")!) { return }
@@ -82,8 +93,6 @@ class ViewController: UIViewController {
                 $0.alpha = alpha
             }
         }
-        
-        isNavigationBarEffectVisible = visible
     }
 
 }

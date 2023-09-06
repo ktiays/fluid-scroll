@@ -7,6 +7,7 @@
 #import <memory>
 #import <optional>
 #import <cassert>
+#import <cmath>
 
 #import "FSVScrollView.h"
 #import "fluid_scroll.h"
@@ -186,6 +187,7 @@ enum class _BounceEdge {
     CADisplayLink *_displayLink;
     NSHashTable *_scrollObservers;
     bool _isFirstLayout;
+    void (^_scrollsToTopAnimationCallback)(void);
     
     FlScroller *_scrollerX;
     FlScroller *_scrollerY;
@@ -206,6 +208,10 @@ enum class _BounceEdge {
     CGFloat _animationBeginTime;
     CGPoint _animationBeginContentOffset;
     CGPoint _animationBeginVelocity;
+    
+    CGPoint _cachedMinimumContentOffset;
+    CGPoint _cachedMaximumContentOffset;
+    bool _isCachedMinMaxContentOffsetInvalid;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -220,6 +226,7 @@ enum class _BounceEdge {
         _bounceEdgeY = _BounceEdge::NONE;
         _scrollObservers = [NSHashTable weakObjectsHashTable];
         _decelerationRate = UIScrollViewDecelerationRateNormal;
+        _isCachedMinMaxContentOffsetInvalid = true;
     }
     return self;
 }
@@ -306,6 +313,7 @@ enum class _BounceEdge {
             _isDragging = false;
             _isDecelerating = false;
             _isBouncing = false;
+            _scrollsToTopAnimationCallback = nil;
             _bounceEdgeX = _BounceEdge::NONE;
             _bounceEdgeY = _BounceEdge::NONE;
             _lastContentOffset.x = [self _rubberBandForOffset:_contentOffset.x
@@ -368,12 +376,16 @@ enum class _BounceEdge {
 #pragma mark - Actions
 
 - (void)_handleEndPanWithVelocity:(CGPoint)velocity {
+    if ([self _outOfRange]) {
+        [self _prepareBouncingWithVelocity:velocity overflowVelocity:true];
+        return;
+    }
+    
     if (CGPointEqualToPoint(velocity, CGPointZero)) {
         return;
     }
     
     [self _updateAnimationPropertiesWithVelocity:velocity];
-    
     [self _prepareScrollers];
     [self _updateScrollersDecelerationRate];
     _isDecelerating = true;
@@ -383,43 +395,19 @@ enum class _BounceEdge {
     if (_isDecelerating) {
         CGPoint velocity;
         _isDecelerating = ![self _handleDeceleratingWithInterval:(CACurrentMediaTime() - _animationBeginTime) * 1e3 finalVelocity:&velocity];
-        
-        const auto canHorizontalScroll = [self _canHorizontalScroll];
-        const auto canVerticalScroll = [self _canVerticalScroll];
-        const auto contentOffset = _contentOffset;
-        const auto minContentOffset = self.minimumContentOffset;
-        const auto maxContentOffset = self.maximumContentOffset;
-        CGPoint targetOffset = CGPointZero;
-        if (canHorizontalScroll && contentOffset.x < minContentOffset.x) {
-            _bounceEdgeX = _BounceEdge::MIN;
-            targetOffset.x = minContentOffset.x;
-        }
-        if (canHorizontalScroll && contentOffset.x > maxContentOffset.x) {
-            _bounceEdgeX = _BounceEdge::MAX;
-            targetOffset.x = maxContentOffset.x;
-        }
-        if (canVerticalScroll && contentOffset.y < minContentOffset.y) {
-            _bounceEdgeY = _BounceEdge::MIN;
-            targetOffset.y = minContentOffset.y;
-        }
-        if (canVerticalScroll && contentOffset.y > maxContentOffset.y) {
-            _bounceEdgeY = _BounceEdge::MAX;
-            targetOffset.y = maxContentOffset.y;
-        }
-        const auto outOfRange = (_bounceEdgeX != _BounceEdge::NONE || _bounceEdgeY != _BounceEdge::NONE);
-        if (_isDecelerating && outOfRange) {
+        if (_isDecelerating && [self _outOfRange]) {
             _isDecelerating = false;
-            _isBouncing = true;
-            [self _updateAnimationPropertiesWithVelocity:velocity];
-            [self _prepareSpringBacks];
-            if (_bounceEdgeX != _BounceEdge::NONE) 
-                fl_spring_back_absorb(_springBackX, velocity.x, targetOffset.x - contentOffset.x);
-            if (_bounceEdgeY != _BounceEdge::NONE)
-                fl_spring_back_absorb(_springBackY, velocity.y, targetOffset.y - contentOffset.y);
+            [self _prepareBouncingWithVelocity:velocity overflowVelocity:false];
         }
     }
     if (_isBouncing) {
         _isBouncing = ![self _handleBouncingWithInterval:(CACurrentMediaTime() - _animationBeginTime) * 1e3];
+        if (!_isBouncing) {
+            if (_scrollsToTopAnimationCallback) {
+                _scrollsToTopAnimationCallback();
+                _scrollsToTopAnimationCallback = nil;
+            }
+        }
     }
 }
 
@@ -445,6 +433,53 @@ enum class _BounceEdge {
     }
     self.contentOffset = targetContentOffset;
     return finishX && finishY;
+}
+
+- (void)_prepareBouncingWithVelocity:(CGPoint)velocity overflowVelocity:(bool)overflowVelocity {
+    // Divide the overflow distance by 100 as the initial bounce velocity of the current position.
+    const auto outVelocityX = [self _outOfRangeX] / 100;
+    const auto outVelocityY = [self _outOfRangeY] / 100;
+    assert(outVelocityX != 0 || outVelocityY != 0);
+    
+    if (overflowVelocity) {
+        if (std::signbit(outVelocityX) != std::signbit(velocity.x)) {
+            velocity.x += outVelocityX;
+        } else {
+            velocity.x = outVelocityX;
+        }
+        if (std::signbit(outVelocityY) != std::signbit(velocity.y)) {
+            velocity.y += outVelocityY;
+        } else {
+            velocity.y = outVelocityY;
+        }
+    }
+    
+    [self _updateAnimationPropertiesWithVelocity:velocity];
+    [self _prepareSpringBacks];
+    _isBouncing = true;
+    
+    const auto minContentOffset = self.minimumContentOffset;
+    const auto maxContentOffset = self.maximumContentOffset;
+    
+    CGPoint targetOffset = CGPointZero;
+    if (outVelocityX < 0) {
+        _bounceEdgeX = _BounceEdge::MIN;
+        targetOffset.x = minContentOffset.x;
+    } else if (outVelocityX > 0) {
+        _bounceEdgeX = _BounceEdge::MAX;
+        targetOffset.x = maxContentOffset.x;
+    }
+    if (outVelocityY < 0) {
+        _bounceEdgeY = _BounceEdge::MIN;
+        targetOffset.y = minContentOffset.y;
+    } else if (outVelocityY > 0) {
+        _bounceEdgeY = _BounceEdge::MAX;
+        targetOffset.y = maxContentOffset.y;
+    }
+    if (_bounceEdgeX != _BounceEdge::NONE)
+        fl_spring_back_absorb(_springBackX, velocity.x, targetOffset.x - _contentOffset.x);
+    if (_bounceEdgeY != _BounceEdge::NONE)
+        fl_spring_back_absorb(_springBackY, velocity.y, targetOffset.y - _contentOffset.y);
 }
 
 - (bool)_handleBouncingWithInterval:(CFTimeInterval)interval {
@@ -488,10 +523,19 @@ enum class _BounceEdge {
 
 #pragma mark - Public Methods
 
-- (void)scrollToTop {
+- (void)scrollsToTopWithCompletionHandler:(void (^)(void))completionHandler {
     if (![self _canVerticalScroll]) {
         return;
     }
+    _scrollsToTopAnimationCallback = completionHandler;
+    _isDragging = false;
+    _isTracking = false;
+    _isBouncing = true;
+    
+//    [self _updateAnimationPropertiesWithVelocity:velocity];
+//    [self _prepareSpringBacks];
+//    if (_bounceEdgeY != _BounceEdge::NONE)
+//        fl_spring_back_absorb(_springBackY, velocity.y, self.minimumContentOffset.y - _contentOffset.y);
 }
 
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer {
@@ -544,19 +588,48 @@ enum class _BounceEdge {
     }
 }
 
-- (BOOL)_outOfRange {
+- (CGFloat)_outOfRangeX {
+    if (![self _canHorizontalScroll]) {
+        return 0;
+    }
     const auto contentOffset = _contentOffset;
     const auto minContentOffset = self.minimumContentOffset;
     const auto maxContentOffset = self.maximumContentOffset;
-    const auto outOfRangeX = (contentOffset.x < minContentOffset.x || contentOffset.x > maxContentOffset.x) && [self _canHorizontalScroll];
-    const auto outOfRangeY = (contentOffset.y < minContentOffset.y || contentOffset.y > maxContentOffset.y) && [self _canVerticalScroll];
-    return outOfRangeX || outOfRangeY;
+    if (contentOffset.x < minContentOffset.x) {
+        return contentOffset.x - minContentOffset.x;
+    } else if (contentOffset.x > maxContentOffset.x) {
+        return contentOffset.x - maxContentOffset.x;
+    } else {
+        return 0;
+    }
+}
+
+- (CGFloat)_outOfRangeY {
+    if (![self _canVerticalScroll]) {
+        return 0;
+    }
+    const auto contentOffset = _contentOffset;
+    const auto minContentOffset = self.minimumContentOffset;
+    const auto maxContentOffset = self.maximumContentOffset;
+    if (contentOffset.y < minContentOffset.y) {
+        return contentOffset.y - minContentOffset.y;
+    } else if (contentOffset.y > maxContentOffset.y) {
+        return contentOffset.y - maxContentOffset.y;
+    } else {
+        return 0;
+    }
+}
+
+- (BOOL)_outOfRange {
+    return [self _outOfRangeY] != 0 || [self _outOfRangeY] != 0;
 }
 
 - (void)_updateAnimationPropertiesWithVelocity:(CGPoint)velocity {
     _animationBeginVelocity = velocity;
     _animationBeginContentOffset = _contentOffset;
     _animationBeginTime = CACurrentMediaTime();
+    _bounceEdgeX = _BounceEdge::NONE;
+    _bounceEdgeY = _BounceEdge::NONE;
 }
 
 - (void)_prepareSpringBacks {
@@ -583,11 +656,13 @@ enum class _BounceEdge {
 - (void)setContentSize:(CGSize)contentSize {
     _contentSize = contentSize;
     [self setNeedsLayout];
+    _isCachedMinMaxContentOffsetInvalid = true;
 }
 
 - (void)setContentInsets:(UIEdgeInsets)contentInsets {
     _contentInsets = contentInsets;
     [self setNeedsLayout];
+    _isCachedMinMaxContentOffsetInvalid = true;
 }
 
 - (void)setDecelerationRate:(UIScrollViewDecelerationRate)decelerationRate {
@@ -615,15 +690,27 @@ enum class _BounceEdge {
 }
 
 - (CGPoint)minimumContentOffset {
-    const auto adjustedContentInset = self.adjustedContentInset;
-    return CGPointMake(-adjustedContentInset.left, -adjustedContentInset.top);
+    if (_isCachedMinMaxContentOffsetInvalid) {
+        [self _updateCachedMinMaxContentOffset];
+        _isCachedMinMaxContentOffsetInvalid = false;
+    }
+    return _cachedMinimumContentOffset;
 }
 
 - (CGPoint)maximumContentOffset {
+    if (_isCachedMinMaxContentOffsetInvalid) {
+        [self _updateCachedMinMaxContentOffset];
+        _isCachedMinMaxContentOffsetInvalid = false;
+    }
+    return _cachedMaximumContentOffset;
+}
+
+- (void)_updateCachedMinMaxContentOffset {
     const auto contentSize = _contentSize;
     const auto viewSize = self.bounds.size;
     const auto adjustedContentInset = self.adjustedContentInset;
-    return CGPointMake(
+    _cachedMinimumContentOffset = CGPointMake(-adjustedContentInset.left, -adjustedContentInset.top);
+    _cachedMaximumContentOffset = CGPointMake(
         contentSize.width - viewSize.width + adjustedContentInset.right,
         contentSize.height - viewSize.height + adjustedContentInset.bottom
     );
