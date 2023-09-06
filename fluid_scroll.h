@@ -49,6 +49,8 @@ void fl_spring_back_reset(FlSpringBack *spring_back);
 
 float fl_calculate_rubber_band_offset(float offset, float range);
 
+float fl_calculate_rubber_band_offset_inv(float offset, float range);
+
 typedef struct __FlVelocityTracker FlVelocityTracker;
 
 enum FlVelocityTrackerStrategy {

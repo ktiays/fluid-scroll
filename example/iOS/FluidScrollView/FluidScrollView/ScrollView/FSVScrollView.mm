@@ -22,6 +22,17 @@ static void safeDelete(T *ptr) {
     }
 }
 
+template <typename T>
+static T signum(T x) {
+    if (x > 0) {
+        return 1;
+    } else if (x < 0) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
 struct TouchProxy;
 
 @protocol _FSVTouchDelegate <NSObject>
@@ -284,6 +295,11 @@ enum class _BounceEdge {
 - (void)_handlePan:(const TouchProxy &)proxy {
     const auto canHorizontalScroll = [self _canHorizontalScroll];
     const auto canVerticalScroll = [self _canVerticalScroll];
+    
+    const auto viewportSize = self.bounds.size;
+    const auto minContentOffset = self.minimumContentOffset;
+    const auto maxContentOffset = self.maximumContentOffset;
+    
     switch (proxy.state()) {
         case TouchProxy::State::BEGAN:
             _isTracking = true;
@@ -292,7 +308,16 @@ enum class _BounceEdge {
             _isBouncing = false;
             _bounceEdgeX = _BounceEdge::NONE;
             _bounceEdgeY = _BounceEdge::NONE;
-            _lastContentOffset = _contentOffset;
+            _lastContentOffset.x = [self _rubberBandForOffset:_contentOffset.x
+                                                    minOffset:minContentOffset.x
+                                                    maxOffset:maxContentOffset.x
+                                                        range:viewportSize.width
+                                                      inverse:true];
+            _lastContentOffset.y = [self _rubberBandForOffset:_contentOffset.y
+                                                    minOffset:minContentOffset.y
+                                                    maxOffset:maxContentOffset.y
+                                                        range:viewportSize.height
+                                                      inverse:true];
             _touchBeganTranslation = std::nullopt;
             break;
         case TouchProxy::State::CHANGED: {
@@ -309,7 +334,19 @@ enum class _BounceEdge {
             translation = CGPointSub(translation, *_touchBeganTranslation);
             const auto x = canHorizontalScroll ? translation.x : 0;
             const auto y = canVerticalScroll ? translation.y : 0;
-            self.contentOffset = CGPointMake(_lastContentOffset.x - x, _lastContentOffset.y - y);
+            auto targetContentOffsetX = _lastContentOffset.x - x;
+            auto targetContentOffsetY = _lastContentOffset.y -y;
+            targetContentOffsetX = [self _rubberBandForOffset:targetContentOffsetX
+                                                    minOffset:minContentOffset.x
+                                                    maxOffset:maxContentOffset.x
+                                                        range:viewportSize.width
+                                                      inverse:false];
+            targetContentOffsetY = [self _rubberBandForOffset:targetContentOffsetY
+                                                    minOffset:minContentOffset.y
+                                                    maxOffset:maxContentOffset.y
+                                                        range:viewportSize.height
+                                                      inverse:false];
+            self.contentOffset = CGPointMake(targetContentOffsetX, targetContentOffsetY);
         } break;
         case TouchProxy::State::ENDED:
         case TouchProxy::State::CANCELLED: {
@@ -430,6 +467,25 @@ enum class _BounceEdge {
     return finishX && finishY;
 }
 
+- (CGFloat)_rubberBandForOffset:(CGFloat)offset minOffset:(CGFloat)minOffset maxOffset:(CGFloat)maxOffset range:(CGFloat)range inverse:(bool)inverse {
+    if (std::abs(range) < CGFLOAT_EPSILON) {
+        return offset;
+    }
+    
+    const auto min = minOffset;
+    const auto max = std::max(minOffset, maxOffset);
+    
+    if (min <= offset && offset <= max) {
+        return offset;
+    }
+    
+    const auto target = offset < min ? min : max;
+    const auto distance = offset - target;
+    const auto transformed =
+        inverse ? fl_calculate_rubber_band_offset_inv(std::abs(distance), range) : fl_calculate_rubber_band_offset(std::abs(distance), range);
+    return target + transformed * signum(distance);
+}
+
 #pragma mark - Public Methods
 
 - (void)scrollToTop {
@@ -479,11 +535,13 @@ enum class _BounceEdge {
 }
 
 - (void)_notifyScrollObservers {
-    [[_scrollObservers allObjects] enumerateObjectsUsingBlock:^(id<FSVScrollViewScrollObserver> obj, NSUInteger idx, BOOL *stop) {
-        if ([obj respondsToSelector:@selector(observeScrollViewDidScroll:)]) {
-            [obj observeScrollViewDidScroll:self];
+    auto enumerator = [_scrollObservers objectEnumerator];
+    id<FSVScrollViewScrollObserver> observer;
+    while (observer = [enumerator nextObject]) {
+        if ([observer respondsToSelector:@selector(observeScrollViewDidScroll:)]) {
+            [observer observeScrollViewDidScroll:self];
         }
-    }];
+    }
 }
 
 - (BOOL)_outOfRange {
@@ -519,12 +577,7 @@ enum class _BounceEdge {
 - (void)setContentOffset:(CGPoint)contentOffset {
     _contentOffset = contentOffset;
     [self setNeedsLayout];
-    
-    auto enumerator = [_scrollObservers objectEnumerator];
-    id<FSVScrollViewScrollObserver> observer;
-    while (observer = [enumerator nextObject]) {
-        [observer observeScrollViewDidScroll:self];
-    }
+    [self _notifyScrollObservers];
 }
 
 - (void)setContentSize:(CGSize)contentSize {

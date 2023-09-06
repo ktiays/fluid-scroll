@@ -121,6 +121,11 @@ pub extern "C" fn fl_calculate_rubber_band_offset(offset: f32, range: f32) -> f3
 }
 
 #[no_mangle]
+pub extern "C" fn fl_calculate_rubber_band_offset_inv(offset: f32, range: f32) -> f32 {
+    rubber_band::calculate_offset_inv(offset, range)
+}
+
+#[no_mangle]
 pub extern "C" fn fl_velocity_tracker_new(strategy: Strategy) -> *mut c_void {
     let velocity_tracker = Box::new(VelocityTracker::with_strategy(strategy));
     Box::into_raw(velocity_tracker) as *mut _
