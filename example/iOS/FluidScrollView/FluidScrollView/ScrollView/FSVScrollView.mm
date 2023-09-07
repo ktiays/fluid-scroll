@@ -266,7 +266,6 @@ public:
     bool _isFirstLayout;
     void (^_scrollsToTopAnimationCallback)(void);
     bool _ignoreScrollObserver;
-    bool _ignoreFittingContentSizeRequest;
     
     std::unique_ptr<TouchProxy> _touchProxy;
     // Records the translation of the gesture's first response.
@@ -656,15 +655,6 @@ public:
     [_scrollObservers addObject:observer];
 }
 
-- (void)fitContentOffsetToContentSizeIfNeededAfterAction:(void (^)(FSVScrollView *scrollView))action {
-    _ignoreFittingContentSizeRequest = true;
-    if (action) {
-        action(self);
-    }
-    _ignoreFittingContentSizeRequest = false;
-    [self _fitContentOffsetToContentSizeIfNeeded];
-}
-
 #pragma mark - Private Methods
 
 - (BOOL)_canHorizontalScroll FSV_DIRECT {
@@ -737,40 +727,29 @@ public:
         _isCachedMinMaxContentOffsetInvalid = true;
         return;
     }
-    
-    const auto oldMin = self.minimumContentOffset;
-    const auto oldMax = self.maximumContentOffset;
-    
-    const auto oldRange = CGPointSub(oldMax, oldMin);
-    auto ratio = CGPointDiv(CGPointSub(_contentOffset, oldMin), oldRange);
-    ratio = CGPointClamp(ratio, CGPointZero, CGPointOne);
-    
+    auto min = self.minimumContentOffset;
+    const auto distance = CGPointSub(_contentOffset, min);
     _isCachedMinMaxContentOffsetInvalid = true;
-    
-    const auto min = self.minimumContentOffset;
-    const auto max = self.maximumContentOffset;
-    
-    // Set its content offset in the new boundary according to the percentage of ocntent offset in the previous boundary.
-    auto target = CGPointAdd(min, CGPointMul(ratio, CGPointSub(max, min)));
+    min = self.minimumContentOffset;
+    auto target = CGPointAdd(min, distance);
     if (![self _canHorizontalScroll]) {
         target.x = 0;
     }
     if (![self _canVerticalScroll]) {
         target.y = 0;
     }
-    self.contentOffset = target;
+    self.contentOffset = CGPointClamp(target, min, self.maximumContentOffset);
 }
 
 #pragma mark - Getters & Setters
 
 - (void)setFrame:(CGRect)frame {
-    if (!CGSizeEqualToSize(frame.size, self.bounds.size)) {
-        // When the view size changes, it will also cause a change in the boundary of the content offset.
-        if (!_ignoreFittingContentSizeRequest) {
-            [self _fitContentOffsetToContentSizeIfNeeded];
-        }
-    }
+    bool needFitting = !CGSizeEqualToSize(frame.size, self.bounds.size);
     [super setFrame:frame];
+    if (needFitting) {
+        // When the view size changes, it will also cause a change in the boundary of the content offset.
+        [self _fitContentOffsetToContentSizeIfNeeded];
+    }
 }
 
 - (void)setContentOffset:(CGPoint)contentOffset {
@@ -786,9 +765,7 @@ public:
         return;
     }
     _contentSize = contentSize;
-    if (!_ignoreFittingContentSizeRequest) {
-        [self _fitContentOffsetToContentSizeIfNeeded];
-    }
+    [self _fitContentOffsetToContentSizeIfNeeded];
     [self setNeedsLayout];
 }
 
@@ -797,8 +774,8 @@ public:
         return;
     }
     _contentInsets = contentInsets;
+    [self _fitContentOffsetToContentSizeIfNeeded];
     [self setNeedsLayout];
-    _isCachedMinMaxContentOffsetInvalid = true;
 }
 
 - (void)setDecelerationRate:(UIScrollViewDecelerationRate)decelerationRate {

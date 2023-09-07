@@ -9,9 +9,11 @@
 
 CGPoint CGPointOne = CGPointMake(1, 1);
 
-CGPoint CGPointClamp(const CGPoint point, const CGPoint min, const CGPoint max) {
+CGPoint CGPointClamp(const CGPoint point, CGPoint min, const CGPoint max) {
+    min.x = std::min(min.x, max.x);
+    min.y = std::min(min.y, max.y);
     return CGPointMake(
-        std::max(min.x, std::min(point.x, point.x)),
-        std::max(min.y, std::min(point.y, point.y))
+        std::max(min.x, std::min(point.x, max.x)),
+        std::max(min.y, std::min(point.y, max.y))
     );
 }

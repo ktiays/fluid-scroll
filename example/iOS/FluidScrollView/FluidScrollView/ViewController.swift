@@ -84,10 +84,8 @@ class ViewController: UIViewController {
         
         let imagesSize = imagesHostView.sizeThatFits(.init(width: .infinity, height: viewportSize.height))
         imagesHostView.frame = .init(origin: .zero, size: imagesSize)
-        imagesView.fitContentOffsetToContentSizeIfNeeded { view in
-            view.frame = .init(origin: .zero, size: .init(width: viewportSize.width, height: imagesSize.height))
-            view.contentSize = .init(width: floor(imagesSize.width), height: floor(imagesSize.height))
-        }
+        imagesView.frame = .init(origin: .zero, size: .init(width: viewportSize.width, height: imagesSize.height))
+        imagesView.contentSize = .init(width: floor(imagesSize.width), height: floor(imagesSize.height))
         
         let contentViewSize = contentView.sizeThatFits(.init(width: viewportSize.width - horizontalInset, height: .infinity))
         contentView.frame = .init(
