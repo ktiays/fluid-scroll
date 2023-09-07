@@ -11,6 +11,7 @@
 		2D65664B2AA5AD0200F04152 /* FSVScrollToTop.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */; };
 		2D65664E2AA5BF9400F04152 /* UIEdgeInsetsMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */; };
 		2D736C192AA6D1780053829A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D736C182AA6D1780053829A /* ContentView.swift */; };
+		ED444A5B2AAA130600742CE8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED444A5A2AAA130600742CE8 /* SettingsView.swift */; };
 		EDB8D6592AA4E2BE001E1723 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8D6582AA4E2BE001E1723 /* AppDelegate.swift */; };
 		EDB8D65B2AA4E2BE001E1723 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8D65A2AA4E2BE001E1723 /* SceneDelegate.swift */; };
 		EDB8D65D2AA4E2BE001E1723 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDB8D65C2AA4E2BE001E1723 /* ViewController.swift */; };
@@ -44,6 +45,7 @@
 		2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = UIEdgeInsetsMath.m; sourceTree = "<group>"; };
 		2D6566512AA5DD3400F04152 /* FSVScrollViewScrollObserver.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollViewScrollObserver.h; sourceTree = "<group>"; };
 		2D736C182AA6D1780053829A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		ED444A5A2AAA130600742CE8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		EDB8D6552AA4E2BE001E1723 /* FluidScrollView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FluidScrollView.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EDB8D6582AA4E2BE001E1723 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		EDB8D65A2AA4E2BE001E1723 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 				EDB8D65A2AA4E2BE001E1723 /* SceneDelegate.swift */,
 				EDB8D65C2AA4E2BE001E1723 /* ViewController.swift */,
 				2D736C182AA6D1780053829A /* ContentView.swift */,
+				ED444A5A2AAA130600742CE8 /* SettingsView.swift */,
 				EDB8D6872AA4EE68001E1723 /* ScrollView */,
 				EDB8D6832AA4EDD1001E1723 /* Utilities */,
 				EDB8D65E2AA4E2BE001E1723 /* Main.storyboard */,
@@ -246,6 +249,7 @@
 				EDB8D65D2AA4E2BE001E1723 /* ViewController.swift in Sources */,
 				EDB8D6592AA4E2BE001E1723 /* AppDelegate.swift in Sources */,
 				EDB8D6862AA4EE2E001E1723 /* NSSet+Sequence.m in Sources */,
+				ED444A5B2AAA130600742CE8 /* SettingsView.swift in Sources */,
 				2D736C192AA6D1780053829A /* ContentView.swift in Sources */,
 				EDB8D6702AA4E3DB001E1723 /* FSVScrollView.mm in Sources */,
 				2D6566482AA58F3600F04152 /* CGPointMath.mm in Sources */,

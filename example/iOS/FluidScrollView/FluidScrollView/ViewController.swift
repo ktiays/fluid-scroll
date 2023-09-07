@@ -20,7 +20,7 @@ class ViewController: UIViewController {
     
     private var isNavigationBarEffectVisible: Bool = false
     private var cachedNavigationBarEffectViews: [UIView] = []
-
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -28,8 +28,25 @@ class ViewController: UIViewController {
         
         self.title = "Fluid Scroll View"
         self.navigationController?.navigationBar.prefersLargeTitles = false
-        self.navigationItem.rightBarButtonItem = .init(image: .init(systemName: "gearshape"), primaryAction: .init(handler: { _ in
-            
+        self.navigationItem.rightBarButtonItem = .init(image: .init(systemName: "gearshape"), primaryAction: .init(handler: { [unowned self] _ in
+            let settingsViewController = UIHostingController(
+                rootView: SettingsView.init(
+                    horizontalDecelerationRateDidChange: { value in
+                        
+                    }, horizontalBounceResponseDidChange: { value in
+                        
+                    }, verticalDecelerationRateDidChange: { value in
+                        
+                    }, verticalBounceResponseDidChange: { value in
+                        
+                    }
+                )
+            )
+            if let sheet = settingsViewController.sheetPresentationController {
+                sheet.detents = [.medium(), .large()]
+                sheet.prefersGrabberVisible = true
+            }
+            self.present(settingsViewController, animated: true)
         }))
         
         imagesHostView = Group {
