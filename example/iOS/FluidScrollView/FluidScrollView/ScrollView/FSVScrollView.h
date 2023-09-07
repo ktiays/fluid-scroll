@@ -65,7 +65,8 @@ NS_SWIFT_NAME(FluidScrollView)
 
 @property (nonatomic, readonly) CGPoint maximumContentOffset;
 
-- (void)scrollsToTopWithCompletionHandler:(void (^)(void))completionHandler;
+/// Scrolls to the top of the content view.
+- (void)scrollsToTopWithCompletion:(void (^)(void))completion;
 
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer NS_SWIFT_NAME(addScrollObserver(_:));
 

@@ -29,13 +29,6 @@
     }
 
 template <typename T>
-static void safeDelete(T *ptr) {
-    if (ptr != nullptr) {
-        delete ptr;
-    }
-}
-
-template <typename T>
 static T signum(T x) {
     if (x > 0) {
         return 1;
@@ -252,8 +245,12 @@ public:
     }
     
     ~_ScrollProperties() {
-        safeDelete(scroller);
-        safeDelete(spring_back);
+        if (scroller != nullptr) {
+            delete scroller;
+        }
+        if (spring_back != nullptr) {
+            delete spring_back;
+        }
     }
 };
 
@@ -414,6 +411,7 @@ public:
                                                         range:viewportSize.height
                                                       inverse:false];
             self.contentOffset = CGPointMake(targetContentOffsetX, targetContentOffsetY);
+            [self _notifyScrollObservers];
         } break;
         case TouchProxy::State::ENDED:
         case TouchProxy::State::CANCELLED: {
@@ -595,11 +593,11 @@ public:
 
 #pragma mark - Public Methods
 
-- (void)scrollsToTopWithCompletionHandler:(void (^)(void))completionHandler {
+- (void)scrollsToTopWithCompletion:(void (^)(void))completion {
     if (![self _canVerticalScroll]) {
         return;
     }
-    _scrollsToTopAnimationCallback = completionHandler;
+    _scrollsToTopAnimationCallback = completion;
     _isDragging = false;
     _isTracking = false;
     
@@ -687,21 +685,53 @@ public:
     }
 }
 
+- (void)_fitContentOffsetToContentSizeIfNeeded FSV_DIRECT {
+    if (self.isDecelerating) {
+        // During the animation, since the latest value is taken for each frame.
+        // There is no need for additional adjustments.
+        _isCachedMinMaxContentOffsetInvalid = true;
+        return;
+    }
+    
+    const auto oldMin = self.minimumContentOffset;
+    const auto oldMax = self.maximumContentOffset;
+    
+    const auto oldRange = CGPointSub(oldMax, oldMin);
+    auto ratio = CGPointDiv(CGPointSub(_contentOffset, oldMin), oldRange);
+    ratio = CGPointClamp(ratio, CGPointZero, CGPointOne);
+    
+    _isCachedMinMaxContentOffsetInvalid = true;
+    
+    const auto min = self.minimumContentOffset;
+    const auto max = self.maximumContentOffset;
+    
+    const auto target = CGPointAdd(min, CGPointMul(ratio, CGPointSub(max, min)));
+    self.contentOffset = target;
+}
+
 #pragma mark - Getters & Setters
 
 - (void)setContentOffset:(CGPoint)contentOffset {
+    if (CGPointEqualToPoint(_contentOffset, contentOffset)) {
+        return;
+    }
     _contentOffset = contentOffset;
     [self setNeedsLayout];
-    [self _notifyScrollObservers];
 }
 
 - (void)setContentSize:(CGSize)contentSize {
+    if (CGSizeEqualToSize(_contentSize, contentSize)) {
+        return;
+    }
     _contentSize = contentSize;
+    [self _fitContentOffsetToContentSizeIfNeeded];
     [self setNeedsLayout];
-    _isCachedMinMaxContentOffsetInvalid = true;
 }
 
 - (void)setContentInsets:(UIEdgeInsets)contentInsets {
+    if (UIEdgeInsetsEqualToEdgeInsets(_contentInsets, contentInsets)) {
+        return;
+    }
     _contentInsets = contentInsets;
     [self setNeedsLayout];
     _isCachedMinMaxContentOffsetInvalid = true;

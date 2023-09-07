@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2D6566482AA58F3600F04152 /* CGPointMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D6566472AA58F3600F04152 /* CGPointMath.m */; };
+		2D6566482AA58F3600F04152 /* CGPointMath.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2D6566472AA58F3600F04152 /* CGPointMath.mm */; };
 		2D65664B2AA5AD0200F04152 /* FSVScrollToTop.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */; };
 		2D65664E2AA5BF9400F04152 /* UIEdgeInsetsMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */; };
 		2D736C192AA6D1780053829A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D736C182AA6D1780053829A /* ContentView.swift */; };
@@ -37,7 +37,7 @@
 
 /* Begin PBXFileReference section */
 		2D6566462AA58F3600F04152 /* CGPointMath.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CGPointMath.h; sourceTree = "<group>"; };
-		2D6566472AA58F3600F04152 /* CGPointMath.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CGPointMath.m; sourceTree = "<group>"; };
+		2D6566472AA58F3600F04152 /* CGPointMath.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CGPointMath.mm; sourceTree = "<group>"; };
 		2D6566492AA5AD0200F04152 /* FSVScrollToTop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollToTop.h; sourceTree = "<group>"; };
 		2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FSVScrollToTop.m; sourceTree = "<group>"; };
 		2D65664C2AA5BF9400F04152 /* UIEdgeInsetsMath.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UIEdgeInsetsMath.h; sourceTree = "<group>"; };
@@ -134,7 +134,7 @@
 				2D65664C2AA5BF9400F04152 /* UIEdgeInsetsMath.h */,
 				2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */,
 				2D6566462AA58F3600F04152 /* CGPointMath.h */,
-				2D6566472AA58F3600F04152 /* CGPointMath.m */,
+				2D6566472AA58F3600F04152 /* CGPointMath.mm */,
 				2D6566512AA5DD3400F04152 /* FSVScrollViewScrollObserver.h */,
 			);
 			path = ScrollView;
@@ -248,7 +248,7 @@
 				EDB8D6862AA4EE2E001E1723 /* NSSet+Sequence.m in Sources */,
 				2D736C192AA6D1780053829A /* ContentView.swift in Sources */,
 				EDB8D6702AA4E3DB001E1723 /* FSVScrollView.mm in Sources */,
-				2D6566482AA58F3600F04152 /* CGPointMath.m in Sources */,
+				2D6566482AA58F3600F04152 /* CGPointMath.mm in Sources */,
 				EDB8D65B2AA4E2BE001E1723 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

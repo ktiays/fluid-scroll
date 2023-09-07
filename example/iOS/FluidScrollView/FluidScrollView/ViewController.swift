@@ -14,7 +14,7 @@ class ViewController: UIViewController {
     private var cancellables: Set<AnyCancellable> = .init()
     
     private var contentView: UIView!
-    private var isContentViewLayout: Bool = false
+    private var lastViewportSize: CGSize = .zero
     
     private var isNavigationBarEffectVisible: Bool = false
     private var cachedNavigationBarEffectViews: [UIView] = []
@@ -48,21 +48,27 @@ class ViewController: UIViewController {
         }.store(in: &cancellables)
     }
     
-    override func viewWillLayoutSubviews() {
-        super.viewWillLayoutSubviews()
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
         
-        if !isContentViewLayout {
-            let contentViewSize = contentView.sizeThatFits(.init(width: view.bounds.width, height: .infinity))
-            contentView.frame = .init(origin: .zero, size: .init(width: view.bounds.width, height: contentViewSize.height))
-            fluidScrollView.contentSize = .init(width: 1, height: contentViewSize.height)
-            isContentViewLayout = true
-        }
+        let viewportSize = view.bounds.size
+        if lastViewportSize == viewportSize { return }
+        lastViewportSize = viewportSize
+        
+        let safeArea = view.safeAreaInsets
+        let horizontalInset = safeArea.left + safeArea.right
+        let contentViewSize = contentView.sizeThatFits(.init(width: viewportSize.width - horizontalInset, height: .infinity))
+        contentView.frame = .init(
+            origin: .zero,
+            size: .init(width: viewportSize.width - horizontalInset, height: contentViewSize.height)
+        )
+        fluidScrollView.contentSize = .init(width: floor(contentViewSize.width), height: floor(contentViewSize.height))
     }
     
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
         updateCachedViews()
-        updateViewsVisibility(visible: isNavigationBarEffectVisible)
+        updateNavigationBarEffect()
     }
     
     private func updateViewsVisibility(visible: Bool, animated: Bool = false) {
@@ -98,13 +104,17 @@ class ViewController: UIViewController {
         }
         cachedNavigationBarEffectViews = viewsNeedChangeAlpha
     }
+    
+    private func updateNavigationBarEffect() {
+        let offsetY = fluidScrollView.contentOffset.y
+        let minOffsetY = fluidScrollView.minimumContentOffset.y
+        updateViewsVisibility(visible: offsetY > minOffsetY)
+    }
 
 }
 
 extension ViewController: FSVScrollViewScrollObserver {
     func observeScrollViewDidScroll(_ scrollView: FluidScrollView) {
-        let offsetY = scrollView.contentOffset.y
-        let minOffsetY = scrollView.minimumContentOffset.y
-        updateViewsVisibility(visible: offsetY > minOffsetY)
+        updateNavigationBarEffect()
     }
 }
