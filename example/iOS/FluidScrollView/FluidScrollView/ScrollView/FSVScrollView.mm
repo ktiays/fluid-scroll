@@ -732,13 +732,14 @@ public:
     _isCachedMinMaxContentOffsetInvalid = true;
     min = self.minimumContentOffset;
     auto target = CGPointAdd(min, distance);
+    target = CGPointClamp(target, min, self.maximumContentOffset);
     if (![self _canHorizontalScroll]) {
         target.x = 0;
     }
     if (![self _canVerticalScroll]) {
         target.y = 0;
     }
-    self.contentOffset = CGPointClamp(target, min, self.maximumContentOffset);
+    self.contentOffset = target;
 }
 
 #pragma mark - Getters & Setters

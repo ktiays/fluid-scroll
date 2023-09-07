@@ -54,14 +54,76 @@ extension View {
 
 struct ContentView: View {
     
+    private let icons = ["eject.fill", "pc", "shower", "snowflake"]
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                ForEach(0..<4, id: \.self) { index in
+                    VStack {
+                        Image(systemName: icons[index])
+                            .font(.system(size: 24))
+                            .padding(20)
+                            .background {
+                                Circle()
+                                    .foregroundStyle(
+                                        Color(uiColor: .secondarySystemGroupedBackground)
+                                    )
+                            }
+                        Text("Icon \(index + 1)")
+                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13))
+                    }
+                    if index != 3 {
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.vertical, 5)
+            VStack(alignment: .leading) {
+                AsyncImage(url: .init(string: "https://picsum.photos/600/400")) { image in
+                    image.resizable()
+                        .aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color(uiColor: .quaternarySystemFill)
+                }
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay {
+                    ZStack(alignment: .bottomTrailing) {
+                        Color.clear
+                        Text("4.5")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(.thinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(6)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("7km")
+                        .font(.footnote)
+                    Text("Parking")
+                        .bold()
+                        .font(.title3)
+                        .foregroundStyle(.primary)
+                }
+                .padding(6)
+            }
+            .foregroundStyle(.secondary)
+            .padding(4)
+            .background {
+                Color(uiColor: .secondarySystemGroupedBackground)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .padding(.vertical, 8)
             Text("Lorem ipsum dolor sit amet, consectetur adipiscing elit. In malesuada facilisis ornare. Vestibulum faucibus erat eu quam iaculis facilisis. Sed fringilla tempus bibendum. Sed eu consectetur est. Sed cursus ex at diam ornare, non viverra sapien consectetur.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.horizontal)
                 .padding(7)
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 ForEach(0..<20, id: \.self) { i in
                     HStack {
                         VStack(alignment: .leading, spacing: 12) {
@@ -116,8 +178,9 @@ struct ContentView: View {
                 Color(uiColor: .secondarySystemGroupedBackground)
             }
             .clipShape(RoundedRectangle(cornerRadius: 22))
-            .padding(.horizontal)
         }
+        .padding(.horizontal)
+        .padding(.bottom)
         .ignoresSafeArea()
     }
 }
