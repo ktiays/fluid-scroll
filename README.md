@@ -4,6 +4,12 @@
 
 The library provides iOS-like scrolling animation algorithm, including scroll inertia and edge bounce.
 
+## Motivation
+
+Scrolling is an extremely important part of touch-based interaction, and almost all of our interactions rely on scrolling. We believe that the scrolling effect of iOS is the best among widely used mobile platforms at present. It is smooth, responsive, and has a good sense of inertia. We hope to bring the scrolling effect of iOS to other platforms.
+
+This library aims to restore the scrolling effect of `UIScrollView` on iOS as much as possible. It is suitable for implementing scrolling effects in games and other scenarios.
+
 ## Usage
 
 > [!Note]
