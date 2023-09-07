@@ -70,6 +70,8 @@ NS_SWIFT_NAME(FluidScrollView)
 
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer NS_SWIFT_NAME(addScrollObserver(_:));
 
+- (void)fitContentOffsetToContentSizeIfNeededAfterAction:(void (^)(FSVScrollView *scrollView))action;
+
 @end
 
 NS_ASSUME_NONNULL_END

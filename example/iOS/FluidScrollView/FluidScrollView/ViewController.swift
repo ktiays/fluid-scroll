@@ -14,6 +14,8 @@ class ViewController: UIViewController {
     private var cancellables: Set<AnyCancellable> = .init()
     
     private var contentView: UIView!
+    private var imagesHostView: UIView!
+    private lazy var imagesView: FluidScrollView = .init()
     private var lastViewportSize: CGSize = .zero
     
     private var isNavigationBarEffectVisible: Bool = false
@@ -26,6 +28,29 @@ class ViewController: UIViewController {
         
         self.title = "Fluid Scroll View"
         self.navigationController?.navigationBar.prefersLargeTitles = false
+        self.navigationItem.rightBarButtonItem = .init(image: .init(systemName: "gearshape"), primaryAction: .init(handler: { _ in
+            
+        }))
+        
+        imagesHostView = Group {
+            HStack(spacing: 16) {
+                ForEach(0..<10) { _ in
+                    AsyncImage(url: .init(string: "https://picsum.photos/600/400")) { image in
+                        image.resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Color(uiColor: .quaternarySystemFill)
+                    }
+                    .frame(width: 180, height: 120)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                }
+            }
+            .padding()
+            .ignoresSafeArea()
+        }.makeUIView()
+        imagesView.addSubview(imagesHostView)
+        imagesView.alwaysBounceHorizontal = true
+        fluidScrollView.addSubview(imagesView)
         
         contentView = ContentView().makeUIView()
         fluidScrollView.addSubview(contentView)
@@ -34,8 +59,7 @@ class ViewController: UIViewController {
         fluidScrollView.addScrollObserver(self)
         view.addSubview(fluidScrollView)
         fluidScrollView.snp.makeConstraints { make in
-            make.top.bottom.equalToSuperview()
-            make.leading.trailing.equalTo(view.safeAreaLayoutGuide)
+            make.edges.equalToSuperview()
         }
         
         updateCachedViews()
@@ -57,12 +81,23 @@ class ViewController: UIViewController {
         
         let safeArea = view.safeAreaInsets
         let horizontalInset = safeArea.left + safeArea.right
+        
+        let imagesSize = imagesHostView.sizeThatFits(.init(width: .infinity, height: viewportSize.height))
+        imagesHostView.frame = .init(origin: .zero, size: imagesSize)
+        imagesView.fitContentOffsetToContentSizeIfNeeded { view in
+            view.frame = .init(origin: .zero, size: .init(width: viewportSize.width, height: imagesSize.height))
+            view.contentSize = .init(width: floor(imagesSize.width), height: floor(imagesSize.height))
+        }
+        
         let contentViewSize = contentView.sizeThatFits(.init(width: viewportSize.width - horizontalInset, height: .infinity))
         contentView.frame = .init(
-            origin: .zero,
+            origin: .init(x: safeArea.left, y: imagesSize.height),
             size: .init(width: viewportSize.width - horizontalInset, height: contentViewSize.height)
         )
-        fluidScrollView.contentSize = .init(width: floor(contentViewSize.width), height: floor(contentViewSize.height))
+        fluidScrollView.contentSize = .init(
+            width: floor(contentViewSize.width), 
+            height: floor(contentViewSize.height + imagesSize.height)
+        )
     }
     
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {

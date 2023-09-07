@@ -266,6 +266,7 @@ public:
     bool _isFirstLayout;
     void (^_scrollsToTopAnimationCallback)(void);
     bool _ignoreScrollObserver;
+    bool _ignoreFittingContentSizeRequest;
     
     std::unique_ptr<TouchProxy> _touchProxy;
     // Records the translation of the gesture's first response.
@@ -280,6 +281,9 @@ public:
     CGPoint _cachedMinimumContentOffset;
     CGPoint _cachedMaximumContentOffset;
     bool _isCachedMinMaxContentOffsetInvalid;
+    
+    // Records touch events that result in conflicts.
+    NSMutableSet<UITouch *> *_ignoredTouches;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -291,6 +295,7 @@ public:
         _isCachedMinMaxContentOffsetInvalid = true;
         _propertiesX = std::make_shared<_ScrollProperties>();
         _propertiesY = std::make_shared<_ScrollProperties>();
+        _ignoredTouches = [NSMutableSet set];
     }
     return self;
 }
@@ -330,7 +335,22 @@ public:
 #pragma mark - Touches
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesBegan:touches withEvent:event];
+    for (UITouch *touch in touches) {
+        const auto location = [touch locationInView:self.window];
+        for (UIView *view in self.subviews) {
+            // If there is a scroll view under the touch position and it can respond to events, then pass the touch event to the subview.
+            //
+            // ps. This is a simple processing method, and the effect is not the best.
+            const auto rect = [view convertRect:view.frame toView:nil];
+            if (view.isUserInteractionEnabled && [view isKindOfClass:self.class]) {
+                if (CGRectContainsPoint(rect, location)) {
+                    [_ignoredTouches addObject:touch];
+                    [super touchesBegan:touches withEvent:event];
+                    return;
+                }
+            }
+        }
+    }
     if (!_touchProxy) {
         _touchProxy = std::make_unique<TouchProxy>(self);
     }
@@ -342,12 +362,28 @@ public:
 }
 
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesMoved:touches withEvent:event];
+    for (UITouch *touch in touches) {
+        if ([_ignoredTouches containsObject:touch]) {
+            [super touchesMoved:touches withEvent:event];
+            return;
+        }
+    }
     _touchProxy->move_with_touches(touches);
 }
 
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesEnded:touches withEvent:event];
+    bool ignore = false;
+    for (UITouch *touch in touches) {
+        if ([_ignoredTouches containsObject:touch]) {
+            ignore = true;
+            // Removes the element from the record when touch ends.
+            [_ignoredTouches removeObject:touch];
+        }
+    }
+    if (ignore) {
+        [super touchesEnded:touches withEvent:event];
+        return;
+    }
     _touchProxy->end_with_touches(touches, false);
 }
 
@@ -620,6 +656,15 @@ public:
     [_scrollObservers addObject:observer];
 }
 
+- (void)fitContentOffsetToContentSizeIfNeededAfterAction:(void (^)(FSVScrollView *scrollView))action {
+    _ignoreFittingContentSizeRequest = true;
+    if (action) {
+        action(self);
+    }
+    _ignoreFittingContentSizeRequest = false;
+    [self _fitContentOffsetToContentSizeIfNeeded];
+}
+
 #pragma mark - Private Methods
 
 - (BOOL)_canHorizontalScroll FSV_DIRECT {
@@ -705,11 +750,28 @@ public:
     const auto min = self.minimumContentOffset;
     const auto max = self.maximumContentOffset;
     
-    const auto target = CGPointAdd(min, CGPointMul(ratio, CGPointSub(max, min)));
+    // Set its content offset in the new boundary according to the percentage of ocntent offset in the previous boundary.
+    auto target = CGPointAdd(min, CGPointMul(ratio, CGPointSub(max, min)));
+    if (![self _canHorizontalScroll]) {
+        target.x = 0;
+    }
+    if (![self _canVerticalScroll]) {
+        target.y = 0;
+    }
     self.contentOffset = target;
 }
 
 #pragma mark - Getters & Setters
+
+- (void)setFrame:(CGRect)frame {
+    if (!CGSizeEqualToSize(frame.size, self.bounds.size)) {
+        // When the view size changes, it will also cause a change in the boundary of the content offset.
+        if (!_ignoreFittingContentSizeRequest) {
+            [self _fitContentOffsetToContentSizeIfNeeded];
+        }
+    }
+    [super setFrame:frame];
+}
 
 - (void)setContentOffset:(CGPoint)contentOffset {
     if (CGPointEqualToPoint(_contentOffset, contentOffset)) {
@@ -724,7 +786,9 @@ public:
         return;
     }
     _contentSize = contentSize;
-    [self _fitContentOffsetToContentSizeIfNeeded];
+    if (!_ignoreFittingContentSizeRequest) {
+        [self _fitContentOffsetToContentSizeIfNeeded];
+    }
     [self setNeedsLayout];
 }
 

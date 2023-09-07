@@ -55,7 +55,12 @@ extension View {
 struct ContentView: View {
     
     var body: some View {
-        VStack {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Lorem ipsum dolor sit amet, consectetur adipiscing elit. In malesuada facilisis ornare. Vestibulum faucibus erat eu quam iaculis facilisis. Sed fringilla tempus bibendum. Sed eu consectetur est. Sed cursus ex at diam ornare, non viverra sapien consectetur.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+                .padding(7)
             VStack(spacing: 12) {
                 ForEach(0..<20, id: \.self) { i in
                     HStack {
@@ -111,7 +116,7 @@ struct ContentView: View {
                 Color(uiColor: .secondarySystemGroupedBackground)
             }
             .clipShape(RoundedRectangle(cornerRadius: 22))
-            .padding()
+            .padding(.horizontal)
         }
         .ignoresSafeArea()
     }

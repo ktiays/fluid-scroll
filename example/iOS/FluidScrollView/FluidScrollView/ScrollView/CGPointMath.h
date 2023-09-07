@@ -27,11 +27,14 @@ inline CGPoint CGPointMul(const CGPoint lhs, const CGPoint rhs) {
 }
 
 inline CGPoint CGPointDiv(const CGPoint lhs, const CGFloat rhs) {
+    if (rhs == 0) {
+        return lhs;
+    }
     return CGPointMake(lhs.x / rhs, lhs.y / rhs);
 }
 
 inline CGPoint CGPointDiv(const CGPoint lhs, const CGPoint rhs) {
-    return CGPointMake(lhs.x / rhs.x, lhs.y / rhs.y);
+    return CGPointMake(rhs.x == 0 ? lhs.x : (lhs.x / rhs.x), rhs.y == 0 ? lhs.y : (lhs.y / rhs.y));
 }
 
 CGPoint CGPointClamp(const CGPoint point, const CGPoint min, const CGPoint max);
