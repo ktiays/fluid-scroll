@@ -43,7 +43,8 @@ static CGFloat CGPointValue(CGPoint point, UIAxis axis) {
     AXIS_HANDLER(point.x, point.y, 0);
 }
 
-static void     enumerate_axes(void (^action)(UIAxis axis)) {
+/// Enumerates horizontal and vertical axes to perform the specified action.
+static void enumerate_axes(void (^action)(UIAxis axis)) {
     action(UIAxisHorizontal);
     action(UIAxisVertical);
 }
@@ -88,6 +89,8 @@ public:
     
     void begin_with_touches(NSSet<UITouch *> *touches) {
         if (active_touch_ != nil) {
+            // It means a touch event is already in progress.
+            // Current touch will be treated as a new response touch.
             auto enumerator = [touches objectEnumerator];
             UITouch *touch;
             while (touch = [enumerator nextObject]) {
@@ -193,6 +196,7 @@ enum class _BounceEdge {
     MIN, MAX
 };
 
+/// A struct that records the state of the scroll animation.
 struct _ScrollProperties {
 public:
     bool is_decelerating = false;
@@ -401,6 +405,7 @@ public:
     
     switch (proxy.state()) {
         case TouchProxy::State::BEGAN:
+            // When the touch event began, clear all animation states.
             _isTracking = true;
             _isDragging = false;
             _propertiesX->clear();
@@ -510,6 +515,8 @@ public:
                 if (self->_scrollsToTopAnimationCallback) {
                     const auto offset = [self _offsetForAxis:axis];
                     const auto minOffset = [self _minimumOffsetForAxis:axis];
+                    // When performing the scroll-to-top animation, it is necessary to allow some extra time 
+                    // for the navigation bar to complete its alpha animation.
                     if (std::abs(offset - minOffset) <= 2) {
                         self->_scrollsToTopAnimationCallback();
                         self->_scrollsToTopAnimationCallback = nil;
@@ -641,12 +648,14 @@ public:
     if (distance > 0) {
         const auto properties = [self _scrollPropertiesForAxis:UIAxisVertical];
         properties->is_decelerating = false;
+        // Adjusts the startup velocity according to the current position.
         const auto velocity = distance / 100;
         properties->prepare_spring_back();
         properties->reset(velocity, currentOffset);
         properties->bounce_edge = _BounceEdge::MIN;
         fl_spring_back_absorb(properties->spring_back, velocity, -distance);
         properties->is_bouncing = true;
+        // Prevents the scroll observer from being notified during the scrolls-to-top animation.
         _ignoreScrollObserver = true;
     }
 }
@@ -683,10 +692,15 @@ public:
     const auto minOffset = [self _minimumOffsetForAxis:axis];
     const auto maxOffset = [self _maximumOffsetForAxis:axis];
     if (offset < minOffset) {
+        // The offset is less than the minimum offset.
+        // The value is negative.
         return offset - minOffset;
     } else if (offset > maxOffset) {
+        // The offset is greater than the maximum offset.
+        // The value is positive.
         return offset - maxOffset;
     } else {
+        // The offset is within the range of the minimum and maximum offsets.
         return 0;
     }
 }
@@ -727,6 +741,7 @@ public:
         _isCachedMinMaxContentOffsetInvalid = true;
         return;
     }
+    // At this time, the data obtained is still cached.
     auto min = self.minimumContentOffset;
     const auto distance = CGPointSub(_contentOffset, min);
     _isCachedMinMaxContentOffsetInvalid = true;

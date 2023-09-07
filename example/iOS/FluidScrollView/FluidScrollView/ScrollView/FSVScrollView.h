@@ -61,13 +61,16 @@ NS_SWIFT_NAME(FluidScrollView)
 /// The default value is `NO`.
 @property (nonatomic, assign) BOOL alwaysBounceHorizontal;
 
+/// The minimum point (in content view coordinates) that the content view can be scrolled.
 @property (nonatomic, readonly) CGPoint minimumContentOffset;
 
+/// The maximum point (in content view coordinates) that the content view can be scrolled.
 @property (nonatomic, readonly) CGPoint maximumContentOffset;
 
 /// Scrolls to the top of the content view.
 - (void)scrollsToTopWithCompletion:(void (^)(void))completion;
 
+/// Registers the observer object to receive scroll-related messages for the scroll view.
 - (void)addScrollObserver:(id<FSVScrollViewScrollObserver>)observer NS_SWIFT_NAME(addScrollObserver(_:));
 
 @end
