@@ -290,6 +290,7 @@ public:
     
     // Records touch events that result in conflicts.
     NSMutableSet<UITouch *> *_ignoredTouches;
+    UIImpactFeedbackGenerator *_impactFeedback;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -303,6 +304,7 @@ public:
         _propertiesX = std::make_shared<_ScrollProperties>();
         _propertiesY = std::make_shared<_ScrollProperties>();
         _ignoredTouches = [NSMutableSet set];
+        _impactFeedback = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleSoft];
     }
     return self;
 }
@@ -468,6 +470,7 @@ public:
             if (!canHorizontalScroll) velocity.x = 0;
             if (!canVerticalScroll) velocity.y = 0;
             [self _handleEndPanWithVelocity:velocity];
+            [_impactFeedback prepare];
         } break;
         default:
             break;
@@ -507,6 +510,9 @@ public:
             const auto overflow = [self _overflowOffsetForAxis:axis];
             if (properties->is_decelerating && overflow != 0) {
                 properties->is_decelerating = false;
+                // Just for fun ^_^
+                [self->_impactFeedback impactOccurredWithIntensity:std::min(std::abs(velocity), 5.0) / 5];
+                [self->_impactFeedback prepare];
                 [self _prepareBouncingWithVelocity:velocity overflowVelocity:false axis:axis];
             }
             [self _setNeedsLayoutWithNotify];
