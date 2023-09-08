@@ -43,6 +43,8 @@ static CGFloat CGPointValue(CGPoint point, UIAxis axis) {
     AXIS_HANDLER(point.x, point.y, 0);
 }
 
+static CGFloat kDefaultSpringBackResponse = 0.575;
+
 /// Enumerates horizontal and vertical axes to perform the specified action.
 static void enumerate_axes(void (^action)(UIAxis axis)) {
     action(UIAxisHorizontal);
@@ -295,6 +297,7 @@ public:
         _isFirstLayout = true;
         _scrollObservers = [NSHashTable weakObjectsHashTable];
         _decelerationRate = UIScrollViewDecelerationRateNormal;
+        _bounceResponse = kDefaultSpringBackResponse;
         _isCachedMinMaxContentOffsetInvalid = true;
         _propertiesX = std::make_shared<_ScrollProperties>();
         _propertiesY = std::make_shared<_ScrollProperties>();
@@ -576,7 +579,7 @@ public:
         targetOffset = maxContentOffset;
     }
     if (properties->bounce_edge != _BounceEdge::NONE) {
-        fl_spring_back_absorb(properties->spring_back, velocity, targetOffset - [self _offsetForAxis:axis]);
+        fl_spring_back_absorb_with_response(properties->spring_back, velocity, targetOffset - [self _offsetForAxis:axis], _bounceResponse);
         properties->is_bouncing = true;
     }
 }
@@ -653,7 +656,7 @@ public:
         properties->prepare_spring_back();
         properties->reset(velocity, currentOffset);
         properties->bounce_edge = _BounceEdge::MIN;
-        fl_spring_back_absorb(properties->spring_back, velocity, -distance);
+        fl_spring_back_absorb_with_response(properties->spring_back, velocity, -distance, _bounceResponse);
         properties->is_bouncing = true;
         // Prevents the scroll observer from being notified during the scrolls-to-top animation.
         _ignoreScrollObserver = true;
@@ -800,6 +803,10 @@ public:
     } else {
         _decelerationRate = decelerationRate;
     }
+}
+
+- (void)setBounceResponse:(CGFloat)bounceResponse {
+    _bounceResponse = bounceResponse <= 0 ? 0.575 : bounceResponse;
 }
 
 - (UIEdgeInsets)adjustedContentInset {

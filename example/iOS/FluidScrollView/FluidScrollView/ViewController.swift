@@ -21,6 +21,8 @@ class ViewController: UIViewController {
     private var isNavigationBarEffectVisible: Bool = false
     private var cachedNavigationBarEffectViews: [UIView] = []
     
+    private let scrollConfiguration = ScrollConfiguration()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -29,19 +31,7 @@ class ViewController: UIViewController {
         self.title = "Fluid Scroll View"
         self.navigationController?.navigationBar.prefersLargeTitles = false
         self.navigationItem.rightBarButtonItem = .init(image: .init(systemName: "gearshape"), primaryAction: .init(handler: { [unowned self] _ in
-            let settingsViewController = UIHostingController(
-                rootView: SettingsView.init(
-                    horizontalDecelerationRateDidChange: { value in
-                        
-                    }, horizontalBounceResponseDidChange: { value in
-                        
-                    }, verticalDecelerationRateDidChange: { value in
-                        
-                    }, verticalBounceResponseDidChange: { value in
-                        
-                    }
-                )
-            )
+            let settingsViewController = UIHostingController(rootView: SettingsView(configuration: scrollConfiguration))
             if let sheet = settingsViewController.sheetPresentationController {
                 sheet.detents = [.medium(), .large()]
                 sheet.prefersGrabberVisible = true
@@ -86,6 +76,12 @@ class ViewController: UIViewController {
                 updateViewsVisibility(visible: false, animated: true)
                 isNavigationBarEffectVisible = false
             }
+        }.store(in: &cancellables)
+        scrollConfiguration.objectWillChange.sink { [unowned self] _ in
+            fluidScrollView.decelerationRate = .init(rawValue: scrollConfiguration.verticalDecelerationRate)
+            fluidScrollView.bounceResponse = scrollConfiguration.verticalBounceResponse
+            imagesView.decelerationRate = .init(rawValue: scrollConfiguration.horizontalDecelerationRate)
+            imagesView.bounceResponse = scrollConfiguration.horizontalBounceResponse
         }.store(in: &cancellables)
     }
     

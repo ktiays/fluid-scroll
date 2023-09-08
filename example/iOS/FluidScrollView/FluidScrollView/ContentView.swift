@@ -54,7 +54,7 @@ extension View {
 
 struct ContentView: View {
     
-    private let icons = ["eject.fill", "pc", "shower", "snowflake"]
+    private let icons = ["eject.fill", "pc", "figure.wave", "snowflake"]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

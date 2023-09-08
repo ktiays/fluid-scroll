@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2D1A2C412AAACA05007879AE /* ScrollConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D1A2C402AAACA04007879AE /* ScrollConfiguration.swift */; };
 		2D6566482AA58F3600F04152 /* CGPointMath.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2D6566472AA58F3600F04152 /* CGPointMath.mm */; };
 		2D65664B2AA5AD0200F04152 /* FSVScrollToTop.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664A2AA5AD0200F04152 /* FSVScrollToTop.m */; };
 		2D65664E2AA5BF9400F04152 /* UIEdgeInsetsMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 2D65664D2AA5BF9400F04152 /* UIEdgeInsetsMath.m */; };
@@ -37,6 +38,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2D1A2C402AAACA04007879AE /* ScrollConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollConfiguration.swift; sourceTree = "<group>"; };
 		2D6566462AA58F3600F04152 /* CGPointMath.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CGPointMath.h; sourceTree = "<group>"; };
 		2D6566472AA58F3600F04152 /* CGPointMath.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = CGPointMath.mm; sourceTree = "<group>"; };
 		2D6566492AA5AD0200F04152 /* FSVScrollToTop.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollToTop.h; sourceTree = "<group>"; };
@@ -99,6 +101,7 @@
 				EDB8D65C2AA4E2BE001E1723 /* ViewController.swift */,
 				2D736C182AA6D1780053829A /* ContentView.swift */,
 				ED444A5A2AAA130600742CE8 /* SettingsView.swift */,
+				2D1A2C402AAACA04007879AE /* ScrollConfiguration.swift */,
 				EDB8D6872AA4EE68001E1723 /* ScrollView */,
 				EDB8D6832AA4EDD1001E1723 /* Utilities */,
 				EDB8D65E2AA4E2BE001E1723 /* Main.storyboard */,
@@ -248,6 +251,7 @@
 				2D65664B2AA5AD0200F04152 /* FSVScrollToTop.m in Sources */,
 				EDB8D65D2AA4E2BE001E1723 /* ViewController.swift in Sources */,
 				EDB8D6592AA4E2BE001E1723 /* AppDelegate.swift in Sources */,
+				2D1A2C412AAACA05007879AE /* ScrollConfiguration.swift in Sources */,
 				EDB8D6862AA4EE2E001E1723 /* NSSet+Sequence.m in Sources */,
 				ED444A5B2AAA130600742CE8 /* SettingsView.swift in Sources */,
 				2D736C192AA6D1780053829A /* ContentView.swift in Sources */,

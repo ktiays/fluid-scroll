@@ -34,6 +34,9 @@ NS_SWIFT_NAME(FluidScrollView)
 /// The default rate is `UIScrollViewDecelerationRateNormal`.
 @property (nonatomic, assign) UIScrollViewDecelerationRate decelerationRate;
 
+/// The stiffness of the edge spring effect, defined as an approximate duration in seconds.
+@property (nonatomic, assign) CGFloat bounceResponse;
+
 /// A Boolean value that indicates whether the user has touched the content to initiate scrolling.
 ///
 /// The value of this property is `YES` if the user has touched the content view but might not have yet have started dragging it.
