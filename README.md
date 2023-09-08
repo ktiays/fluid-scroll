@@ -12,9 +12,9 @@ This library aims to restore the scrolling effect of `UIScrollView` on iOS as mu
 
 ## Preview
 
-https://github.com/ktiays/fluid-scroll/assets/44366293/00ce77e5-92ee-4ea4-b789-7d57b7525039
+https://github.com/ktiays/fluid-scroll/assets/44366293/e92f66aa-15fc-47d8-9a72-b450bfd2a0df
 
-You can find the iOS project used in the screen recording in the `example` directory of the project.
+You can find the iOS project used in the screen recording in the `example` directory of the repository.
 
 ## Usage
 
