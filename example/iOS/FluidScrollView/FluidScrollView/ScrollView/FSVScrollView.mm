@@ -230,6 +230,7 @@ public:
             fl_spring_back_reset(spring_back);
         }
         
+        assert(!std::isnan(velocity) && !std::isnan(offset));
         animation_begin_offset = offset;
         animation_begin_time = CACurrentMediaTime();
         animation_begin_velocity = velocity;

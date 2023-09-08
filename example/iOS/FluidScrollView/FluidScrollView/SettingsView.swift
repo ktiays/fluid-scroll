@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     
     @ObservedObject private var configuration: ScrollConfiguration
+    @Environment(\.dismiss) private var dismiss
     
     init(configuration: ScrollConfiguration) {
         self.configuration = configuration
@@ -45,6 +46,13 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                Button(action: {
+                    dismiss()
+                }, label: {
+                    Text("Done")
+                })
+            }
         }
     }
 }

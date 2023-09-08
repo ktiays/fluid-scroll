@@ -353,7 +353,16 @@ where
     let points = values_iter.zip(times_iter).collect::<Vec<_>>();
     let samples = points
         .windows(2)
-        .map(|window| (*window[1].0 - *window[0].0) / (*window[1].1 - *window[0].1))
+        .filter_map(|window| {
+            let delta_time = window[1].1 - window[0].1;
+            if delta_time == 0_f32 {
+                // The two points are at the same time, so we can't calculate a velocity.
+                // Discard this sample.
+                None
+            } else {
+                Some((window[1].0 - window[0].0) / delta_time)
+            }
+        })
         .collect::<Vec<_>>();
 
     // Save the velocity values of the last two times.
