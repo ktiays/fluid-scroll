@@ -10,6 +10,10 @@ Scrolling is an extremely important part of touch-based interaction, and almost 
 
 This library aims to restore the scrolling effect of `UIScrollView` on iOS as much as possible. It is suitable for implementing scrolling effects in games and other scenarios.
 
+## Preview
+
+https://github.com/ktiays/fluid-scroll/assets/44366293/00ce77e5-92ee-4ea4-b789-7d57b7525039
+
 ## Usage
 
 > [!Note]
