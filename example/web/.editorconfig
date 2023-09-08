@@ -1,0 +1,4 @@
+[*.{js,json}]
+tab_width = 4   
+indent_size = 4
+indent_style = space
