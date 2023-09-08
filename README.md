@@ -19,7 +19,7 @@ You can find the iOS project used in the screen recording in the `example` direc
 ## Usage
 
 > [!Note]
-> All time units in this library are measured in milliseconds, and speed units are measured in pixels per millisecond.
+> All time units in this library are measured in milliseconds, and speed units are measured in points per millisecond.
 
 ### Scroll Inertia
 

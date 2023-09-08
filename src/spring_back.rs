@@ -23,7 +23,7 @@ impl SpringBack {
     pub fn absorb_with_response(&mut self, velocity: f32, distance: f32, response: f32) {
         self.lambda = 2_f32 * PI / response;
         self.c1 = distance;
-        // The formula needs to be calculated in units of pixels per second.
+        // The formula needs to be calculated in units of points per second.
         self.c2 = velocity * 1e3 + self.lambda * distance;
     }
 
@@ -33,7 +33,7 @@ impl SpringBack {
         let offset = (self.c1 + self.c2 * time) * (-self.lambda * time).exp();
 
         let velocity = self.velocity_at(time);
-        // The velocity threshold is in units of pixels per millisecond.
+        // The velocity threshold is in units of points per millisecond.
         // We need to convert velocity to match the unit.
         if offset.abs() < VALUE_THRESHOLD && velocity.abs() * 1e3 < VELOCITY_THRESHOLD {
             None
@@ -50,7 +50,7 @@ impl SpringBack {
 impl SpringBack {
     /// Calculate the velocity at a given time.
     ///
-    /// The unit of speed is pixels per second.
+    /// The unit of speed is points per second.
     fn velocity_at(&self, time: f32) -> f32 {
         (self.c2 - self.lambda * (self.c1 + self.c2 * time)) * (-self.lambda * time).exp()
     }
