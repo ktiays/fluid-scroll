@@ -35,7 +35,7 @@ impl SpringBack {
         let velocity = self.velocity_at(time);
         // The velocity threshold is in units of points per millisecond.
         // We need to convert velocity to match the unit.
-        if offset.abs() < VALUE_THRESHOLD && velocity.abs() * 1e3 < VELOCITY_THRESHOLD {
+        if offset.abs() < VALUE_THRESHOLD && velocity.abs() / 1e3 < VELOCITY_THRESHOLD {
             None
         } else {
             Some(offset)
@@ -50,7 +50,7 @@ impl SpringBack {
 impl SpringBack {
     /// Calculate the velocity at a given time.
     ///
-    /// The unit of speed is points per second.
+    /// The unit of velocity is points per second.
     fn velocity_at(&self, time: f32) -> f32 {
         (self.c2 - self.lambda * (self.c1 + self.c2 * time)) * (-self.lambda * time).exp()
     }
