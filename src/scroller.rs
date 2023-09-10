@@ -16,6 +16,12 @@ impl DecelerationRate {
     pub const FAST: Self = Self(0.99);
 }
 
+impl Default for DecelerationRate {
+    fn default() -> Self {
+        Self::NORMAL
+    }
+}
+
 impl Deref for DecelerationRate {
     type Target = f32;
 

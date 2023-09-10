@@ -464,6 +464,7 @@ public:
             _isDragging = false;
             // The direction of the gesture velocity is opposite to the sign of the content offset change.
             auto velocity = proxy.velocity();
+            printf("(%lf, %lf)\n", velocity.x, velocity.y);
             if (fl_velocity_approaching_halt(velocity.x, velocity.y)) {
                 velocity = CGPointZero;
             }
