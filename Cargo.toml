@@ -8,7 +8,7 @@ edition = "2021"
 ffi = []
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib", "staticlib"]
 
 [profile.release]
 opt-level = 3

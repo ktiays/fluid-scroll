@@ -1,3 +1,10 @@
+mod animate;
+mod closure;
+mod event_adpater;
+mod list_control;
+mod point;
+
+use list_control::ListControl;
 use wasm_bindgen::prelude::*;
 
 // Called by our JS entry point to run.
@@ -7,8 +14,10 @@ fn run() -> Result<(), JsValue> {
     // window object.
     let window = web_sys::window().expect("no global `window` exists");
     let document = window.document().expect("should have a document on window");
-    let container = document.get_element_by_id("app").expect("no app element");
-    container.set_text_content(Some("Hello from Rust!!!"));
+    let container = document
+        .get_element_by_id("container")
+        .expect("no container element");
+    let _list_control = ListControl::new(container);
 
     Ok(())
 }

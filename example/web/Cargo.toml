@@ -1,5 +1,5 @@
 [package]
-name = "web"
+name = "fluid-scroll-web-example"
 version = "0.1.0"
 edition = "2021"
 authors = ["ktiays <cuansky@gmail.com>"]
@@ -8,8 +8,10 @@ authors = ["ktiays <cuansky@gmail.com>"]
 crate-type = ["cdylib"]
 
 [dependencies]
-"fluid-scroll" = { path = "../../" }
+fluid-scroll = { path = "../../" }
 wasm-bindgen = "0.2"
+num = "0.4"
+readonly = "0.2"
 
 [dependencies.web-sys]
 version = "0.3"
@@ -21,4 +23,9 @@ features = [
     "HtmlElement",
     "Node",
     "Window",
+    "MouseEvent",
+    "TouchEvent",
+    "Touch",
+    "TouchList",
+    "Performance",
 ]
