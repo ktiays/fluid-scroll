@@ -48,6 +48,7 @@
 		2D6566512AA5DD3400F04152 /* FSVScrollViewScrollObserver.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollViewScrollObserver.h; sourceTree = "<group>"; };
 		2D736C182AA6D1780053829A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		ED444A5A2AAA130600742CE8 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		ED4E17102AB4B2E200A9E7A1 /* fluid_scroll.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = fluid_scroll.h; path = ../../../fluid_scroll.h; sourceTree = "<group>"; };
 		EDB8D6552AA4E2BE001E1723 /* FluidScrollView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FluidScrollView.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EDB8D6582AA4E2BE001E1723 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		EDB8D65A2AA4E2BE001E1723 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -59,7 +60,6 @@
 		EDB8D66D2AA4E3DA001E1723 /* FluidScrollView-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "FluidScrollView-Bridging-Header.h"; sourceTree = "<group>"; };
 		EDB8D66E2AA4E3DB001E1723 /* FSVScrollView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FSVScrollView.h; sourceTree = "<group>"; };
 		EDB8D66F2AA4E3DB001E1723 /* FSVScrollView.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = FSVScrollView.mm; sourceTree = "<group>"; };
-		EDB8D6762AA4E52B001E1723 /* fluid_scroll.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = fluid_scroll.h; path = ../../../../fluid_scroll.h; sourceTree = "<group>"; };
 		EDB8D6842AA4EE2E001E1723 /* NSSet+Sequence.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "NSSet+Sequence.h"; sourceTree = "<group>"; };
 		EDB8D6852AA4EE2E001E1723 /* NSSet+Sequence.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "NSSet+Sequence.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -109,7 +109,7 @@
 				EDB8D6632AA4E2BF001E1723 /* LaunchScreen.storyboard */,
 				EDB8D6662AA4E2BF001E1723 /* Info.plist */,
 				EDB8D66D2AA4E3DA001E1723 /* FluidScrollView-Bridging-Header.h */,
-				EDB8D6762AA4E52B001E1723 /* fluid_scroll.h */,
+				ED4E17102AB4B2E200A9E7A1 /* fluid_scroll.h */,
 			);
 			path = FluidScrollView;
 			sourceTree = "<group>";
@@ -238,7 +238,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/zsh;
-			shellScript = "cd ../../../\ncargo build --release --features ffi --target aarch64-apple-ios\n";
+			shellScript = "cd ../../\ncargo build --release --features ffi --target aarch64-apple-ios\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -424,8 +424,8 @@
 					"@executable_path/Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"../../../target/aarch64-apple-ios-sim/release",
-					"../../../target/aarch64-apple-ios/release/**",
+					"../../target/aarch64-apple-ios-sim/release",
+					"../../target/aarch64-apple-ios/release",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-lfluid_scroll";
@@ -461,8 +461,8 @@
 					"@executable_path/Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = (
-					"../../../target/aarch64-apple-ios-sim/release",
-					"../../../target/aarch64-apple-ios/release/**",
+					"../../target/aarch64-apple-ios-sim/release",
+					"../../target/aarch64-apple-ios/release",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = "-lfluid_scroll";
