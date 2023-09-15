@@ -8,10 +8,15 @@ pub fn calculate_offset(offset: f32, range: f32) -> f32 {
     (1_f32 - (1_f32 / (offset / range * RUBBER_BAND_COEFFICIENT + 1_f32))) * range
 }
 
-pub fn calculate_offset_inv(offset: f32, range: f32) -> f32 {
-    if offset < 0_f32 || range < 0_f32 || offset >= range {
+pub fn calculate_offset_inv(mut offset: f32, range: f32) -> f32 {
+    if offset < 0_f32 || range < 0_f32 {
         return 0_f32;
     }
+    // The offset and range cannot be equal.
+    // Offset only approaches range infinitely.
+    //
+    // To ensure valid calculation, we set the maximum value of offset slightly smaller than range.
+    offset = offset.min(range - 1e-5);
     (range * offset / (range - offset)) / RUBBER_BAND_COEFFICIENT
 }
 
