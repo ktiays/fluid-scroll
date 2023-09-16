@@ -14,7 +14,7 @@ This library aims to replicate the scrolling effect of `UIScrollView` on iOS as 
 
 https://github.com/ktiays/fluid-scroll/assets/44366293/e92f66aa-15fc-47d8-9a72-b450bfd2a0df
 
-You can find the iOS project used in the screen recording in the `example` directory of the repository.
+You can find the iOS project used in the screen recording in the `example` directory of the repository. You can also find an example of web implementation by WebAssembly.
 
 ## Usage
 
@@ -88,7 +88,45 @@ use fluid_scroll::rubber_band;
 let offset = rubber_band::calculate_offset(200.0, 600.0);
 ```
 
-## FAQ
+### Velocity Tracker
+
+A helper for tracking the velocity of motion events, for implementing flinging and other such gestures.
+
+We have provided two strategies for velocity calculation:
+
+- `Strategy::Lsq2` is the strategy currently being used by Android, and its implementation comes from the Android Open Source Project.
+
+- `Strategy::Recurrence` is a strategy we provide that has an effect more similar to `UIScrollView` in iOS. This is also the default strategy used by our library.
+
+```rust
+use fluid_scroll::VelocityTracker;
+
+// Create a velocity tracker object using the default strategy.
+let mut velocity_tracker = VelocityTracker::new();
+```
+
+You can specify other strategies by the `with_strategy` method.
+
+```rust
+let mut velocity_tracker = VelocityTracker::with_strategy(VelocityTrackerStrategy::Lsq2);
+```
+
+> [!Note]
+> The velocity tracker processes the velocity of one direction. If you need to calculate the 2D velocity that includes both X and Y coordinates, you have to use two instances of velocity tracker.
+
+Then provide the velocity tracker with each sampled point you obtained and its corresponding time.
+
+```rust
+velocity_tracker.add_data_point(1.53283_f32, 0_f32);
+velocity_tracker.add_data_point(3.27537_f32, 376_f32);
+
+// Obtains the final velocity.
+let velocity = velocity_tracker.calculate();
+```
+
+## Related Projects
+
+- [FluidRecyclerView](https://github.com/Helixform/FluidRecyclerView): An Android port of this library.
 
 ## License
 
