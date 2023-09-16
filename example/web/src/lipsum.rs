@@ -1,3 +1,17 @@
+// Copyright 2023 ktiays
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 pub const LIPSUM_CONTENTS: [&str; 15] = [
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus pharetra porta elementum. Mauris sit amet eleifend nisl, vitae tempus elit. Nulla facilisi. Pellentesque eget consectetur tellus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi facilisis volutpat enim. Duis ante lectus, finibus a dolor non, fringilla aliquet felis. Ut pellentesque tellus vel nisl elementum sollicitudin. Nullam non tempor orci, luctus hendrerit lorem. Aliquam mattis erat vulputate tincidunt condimentum. Integer justo lectus, fermentum et velit in, dictum eleifend massa. Maecenas porttitor vulputate mollis.", 
     "Vestibulum erat ex, accumsan malesuada dignissim eget, convallis nec nunc. Proin maximus, purus id suscipit ornare, mi ligula euismod erat, sit amet blandit lacus purus vitae elit. Nullam fringilla sagittis tortor, non tristique ex commodo ut. Morbi lobortis ornare mi quis faucibus. Vestibulum sit amet justo non arcu ullamcorper facilisis. Proin lobortis, purus vitae aliquet porta, orci lacus ultricies mi, vitae gravida odio mauris eget sapien. Vivamus ut ultricies nibh, eget tempus libero. Quisque lacinia at nibh eget tincidunt. Donec non nunc ut quam ultricies vulputate at sit amet purus. Curabitur non porta purus, at maximus nibh.",
