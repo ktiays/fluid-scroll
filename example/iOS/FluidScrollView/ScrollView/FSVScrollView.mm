@@ -323,7 +323,7 @@ public:
     
     if (self.superview) {
         _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(_handleDisplayLinkFire:)];
-        _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(60, 120, 120);
+        _displayLink.preferredFrameRateRange = CAFrameRateRangeMake(80, 120, 120);
         [_displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
     } else {
         [_displayLink invalidate];
