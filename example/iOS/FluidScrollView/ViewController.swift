@@ -19,12 +19,20 @@ import SwiftUI
 
 class ViewController: UIViewController {
     
-    private lazy var fluidScrollView: FluidScrollView = .init()
+    #if USE_SYSTEM_SCROLL_VIEW
+    private lazy var scrollView: UIScrollView = .init()
+    #else
+    private lazy var scrollView: FluidScrollView = .init()
+    #endif
     private var cancellables: Set<AnyCancellable> = .init()
     
     private var contentView: UIView!
     private var imagesHostView: UIView!
+    #if USE_SYSTEM_SCROLL_VIEW
+    private lazy var imagesView: UIScrollView = .init()
+    #else
     private lazy var imagesView: FluidScrollView = .init()
+    #endif
     private var lastViewportSize: CGSize = .zero
     
     private var isNavigationBarEffectVisible: Bool = false
@@ -66,32 +74,39 @@ class ViewController: UIViewController {
         }.makeUIView()
         imagesView.addSubview(imagesHostView)
         imagesView.alwaysBounceHorizontal = true
-        fluidScrollView.addSubview(imagesView)
+        scrollView.addSubview(imagesView)
         
         contentView = ContentView().makeUIView()
-        fluidScrollView.addSubview(contentView)
+        scrollView.addSubview(contentView)
         
-        fluidScrollView.alwaysBounceVertical = true
-        fluidScrollView.addScrollObserver(self)
-        view.addSubview(fluidScrollView)
-        fluidScrollView.snp.makeConstraints { make in
+        scrollView.alwaysBounceVertical = true
+        #if USE_SYSTEM_SCROLL_VIEW
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.showsHorizontalScrollIndicator = false
+        #else
+        scrollView.addScrollObserver(self)
+        #endif
+        view.addSubview(scrollView)
+        scrollView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
         
         updateCachedViews()
-        
+    
+        #if !USE_SYSTEM_SCROLL_VIEW
         NotificationCenter.default.publisher(for: NSNotification.Name.fsvScollViewWillScrollToTop).sink { [unowned self] _ in
-            fluidScrollView.scrollsToTop { [unowned self] in
+            scrollView.scrollsToTop { [unowned self] in
                 updateViewsVisibility(visible: false, animated: true)
                 isNavigationBarEffectVisible = false
             }
         }.store(in: &cancellables)
         scrollConfiguration.objectWillChange.sink { [unowned self] _ in
-            fluidScrollView.decelerationRate = .init(rawValue: scrollConfiguration.verticalDecelerationRate)
-            fluidScrollView.bounceResponse = scrollConfiguration.verticalBounceResponse
+            scrollView.decelerationRate = .init(rawValue: scrollConfiguration.verticalDecelerationRate)
+            scrollView.bounceResponse = scrollConfiguration.verticalBounceResponse
             imagesView.decelerationRate = .init(rawValue: scrollConfiguration.horizontalDecelerationRate)
             imagesView.bounceResponse = scrollConfiguration.horizontalBounceResponse
         }.store(in: &cancellables)
+        #endif
     }
     
     override func viewDidLayoutSubviews() {
@@ -114,7 +129,7 @@ class ViewController: UIViewController {
             origin: .init(x: safeArea.left, y: imagesSize.height),
             size: .init(width: viewportSize.width - horizontalInset, height: contentViewSize.height)
         )
-        fluidScrollView.contentSize = .init(
+        scrollView.contentSize = .init(
             width: floor(contentViewSize.width), 
             height: floor(contentViewSize.height + imagesSize.height)
         )
@@ -161,15 +176,23 @@ class ViewController: UIViewController {
     }
     
     private func updateNavigationBarEffect() {
-        let offsetY = fluidScrollView.contentOffset.y
-        let minOffsetY = fluidScrollView.minimumContentOffset.y
+        let offsetY = scrollView.contentOffset.y
+        let minOffsetY = scrollView.minimumContentOffset.y
         updateViewsVisibility(visible: offsetY > minOffsetY)
     }
 
 }
 
+#if USE_SYSTEM_SCROLL_VIEW
+extension UIScrollView {
+    var minimumContentOffset: CGPoint {
+        .init(x: -adjustedContentInset.left, y: -adjustedContentInset.top)
+    }
+}
+#else
 extension ViewController: FSVScrollViewScrollObserver {
     func observeScrollViewDidScroll(_ scrollView: FluidScrollView) {
         updateNavigationBarEffect()
     }
 }
+#endif
